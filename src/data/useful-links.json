@@ -1,0 +1,50 @@
+[
+  {
+    "id": "city-site",
+    "title": {
+      "fr": "Site de la ville",
+      "en": "City website"
+    },
+    "description": {
+      "fr": "Informations pratiques, actualités et services de la ville de Dinard.",
+      "en": "Practical information, news and city services for Dinard."
+    },
+    "url": "https://www.ville-dinard.fr/"
+  },
+  {
+    "id": "castor-bellux",
+    "title": {
+      "fr": "Le restaurant d'en face",
+      "en": "The restaurant across the street"
+    },
+    "description": {
+      "fr": "La carte et les réservations du restaurant Castor Bellux.",
+      "en": "Menu and bookings for the Castor Bellux restaurant."
+    },
+    "url": "https://www.castorbellux.com/"
+  },
+  {
+    "id": "saint-malo",
+    "title": {
+      "fr": "Aller à St Malo",
+      "en": "Get to Saint-Malo"
+    },
+    "description": {
+      "fr": "Navette maritime entre Dinard et Saint-Malo avec les Bateaux Rouges.",
+      "en": "Sea shuttle between Dinard and Saint-Malo with Bateaux Rouges."
+    },
+    "url": "https://www.bateauxrouges.com/saint-malo-dinard/"
+  },
+  {
+    "id": "markets",
+    "title": {
+      "fr": "Les marchés",
+      "en": "Markets"
+    },
+    "description": {
+      "fr": "Horaires et informations sur les halles et marchés de Dinard.",
+      "en": "Opening times and information about Dinard's market hall and markets."
+    },
+    "url": "https://www.ville-dinard.fr/halles-et-marches/"
+  }
+]

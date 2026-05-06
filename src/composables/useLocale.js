@@ -1,14 +1,21 @@
 import { computed, ref, watch } from "vue";
+import destinationConfig from "../data/destination.json";
 
-const STORAGE_KEY = "le-nid-locale";
+const STORAGE_KEY = "coastal-companion-locale";
 
 const messages = {
   fr: {
-    appName: "Le nid des mouettes",
-    region: "Côte d'Émeraude",
     today: "En ce moment",
     todayShort: "Auj.",
     motionBlocked: "Mouvement bloqué",
+    motionPromptTitle: "Activer le gyroscope ?",
+    motionPromptBody: "Sur iPhone, l'animation de l'eau peut suivre les mouvements de l'appareil si vous autorisez le gyroscope.",
+    motionPromptAllow: "Autoriser",
+    motionPromptLater: "Plus tard",
+    motionPromptLoading: "Demande en cours...",
+    motionPromptDeniedTitle: "Gyroscope refusé",
+    motionPromptDeniedBody: "L'effet de mouvement reste désactivé tant que l'accès au gyroscope n'est pas autorisé.",
+    close: "Fermer",
     displayedTide: "Hauteur de l'eau",
     visualScaleMetric: "Échelle visuelle sur 16 m",
     visualScaleImperial: "Échelle visuelle sur 52 ft",
@@ -34,8 +41,7 @@ const messages = {
     tideCurve: "Courbe du jour",
     tideClock: "Horloge de marée",
     tideLoading: "Chargement des hauteurs...",
-    tideResolution: "Navigation par tranche de 10 minutes.",
-    highlights: "Moments forts",
+    highlights: "Hautes et basses mers",
     highTideFull: "Pleine mer",
     lowTideFull: "Basse mer",
     highTideShort: "PM",
@@ -48,28 +54,18 @@ const messages = {
     chartNow: "Moment T",
     chooseDate: "Date",
     availableWindow: "Jours disponibles",
-    agendaForDate: "Agenda pour cette date",
     previousMonth: "Mois précédent",
     nextMonth: "Mois suivant",
     tapChart: "Touchez la courbe pour voir l'heure et la hauteur.",
-    derivedFromDemo: "Données dérivées comme la démo api-maree.fr",
     dataAttribution: "Source de données : api-maree.fr & open-meteo.com",
     madeBy: "Réalisé par thomaspelfrene.com",
-    localOutings: "Sorties locales",
-    cityAgenda: "Agenda de Dinard",
-    storyEyebrow: "L'esprit du lieu",
-    storyTitle: "Pourquoi Le nid des mouettes ?",
-    storyBody:
-      "Parce qu'il n'est pas rare de voir des mouettes passer sur le balcon, surtout si vous laissez traîner de la nourriture... Et dans cet appartement, comme les mouettes depuis leur nid, vous gardez toujours un oeil sur l'océan.",
-    eventCount: "événement",
-    eventCountPlural: "événements",
-    cityBadge: "Ville",
-    quietDay: "Journée plus calme",
-    quietDayBody: "Le fichier local src/data/events.json est prêt pour ajouter plus de rendez-vous sur Dinard, ses plages, ses jardins et ses quais.",
-    addWeatherKey: "Open-Meteo ne demande pas de clé pour cet affichage.",
+    usefulInfo: "Infos utiles",
+    openLink: "Ouvrir",
+    usefulLinksEmptyTitle: "Aucun lien pour le moment",
+    usefulLinksEmptyBody: "Ajoutez des entrées traduites dans src/data/useful-links.json pour afficher d'autres liens utiles.",
     cachedWeather: "Affichage de la dernière météo mémorisée.",
     weatherFetchError: "Impossible de récupérer la météo :",
-    addTideKey: "Ajoutez VITE_API_MAREE_KEY pour remplacer les marées de démonstration.",
+    tideApiKeyMissing: "Ajoutez une clé api-maree.fr dans src/data/destination.json pour activer les marées réelles.",
     noTideData: "Aucune marée réelle disponible.",
     cachedTides: "Affichage des marées mémorisées.",
     tideFetchError: "Impossible de récupérer les marées :",
@@ -80,10 +76,7 @@ const messages = {
     variable: "Variable",
     gentleBreeze: "Brise douce",
     weatherUnavailable: "Météo indisponible",
-    desktopOnlyTitle: "Le nid des mouettes",
-    desktopOnlyBody: "L'interface du nid des mouettes est disponible uniquement sur tablette et mobile.",
     hourlyDetails: "Détail de la journée",
-    forecastEvery3Hours: "3h",
     nowShort: "Maint.",
     languageUnit: "Lang.",
     temperatureUnit: "Temp.",
@@ -94,11 +87,17 @@ const messages = {
     imperial: "ft",
   },
   en: {
-    appName: "The Seagulls Nest",
-    region: "Emerald Coast",
     today: "Right now",
     todayShort: "Today",
     motionBlocked: "Motion blocked",
+    motionPromptTitle: "Enable gyroscope?",
+    motionPromptBody: "On iPhone, the water animation can react to device movement if you allow gyroscope access.",
+    motionPromptAllow: "Allow",
+    motionPromptLater: "Later",
+    motionPromptLoading: "Requesting access...",
+    motionPromptDeniedTitle: "Gyroscope denied",
+    motionPromptDeniedBody: "Motion effects stay disabled until gyroscope access is allowed.",
+    close: "Close",
     displayedTide: "Water level",
     visualScaleMetric: "Visual scale over 16 m",
     visualScaleImperial: "Visual scale over 52 ft",
@@ -124,8 +123,7 @@ const messages = {
     tideCurve: "Day curve",
     tideClock: "Tide clock",
     tideLoading: "Loading water levels...",
-    tideResolution: "10-minute sampling for the day.",
-    highlights: "Highlights",
+    highlights: "High and low tides",
     highTideFull: "High tide",
     lowTideFull: "Low tide",
     highTideShort: "HW",
@@ -138,28 +136,18 @@ const messages = {
     chartNow: "Now",
     chooseDate: "Date",
     availableWindow: "Available days",
-    agendaForDate: "Agenda for this date",
     previousMonth: "Previous month",
     nextMonth: "Next month",
     tapChart: "Tap the curve to view time and height.",
-    derivedFromDemo: "Derived data similar to the api-maree.fr demo",
     dataAttribution: "Data source: api-maree.fr & open-meteo.com",
     madeBy: "Made by thomaspelfrene.com",
-    localOutings: "Local outings",
-    cityAgenda: "Dinard agenda",
-    storyEyebrow: "Sense of place",
-    storyTitle: "Why The Seagulls Nest?",
-    storyBody:
-      "Because it is not unusual to see seagulls stop by the balcony, especially if food is left out... And in this apartment, like seagulls from their nest, you always keep one eye on the ocean.",
-    eventCount: "event",
-    eventCountPlural: "events",
-    cityBadge: "City",
-    quietDay: "A quieter day",
-    quietDayBody: "The local src/data/events.json file is ready for more Dinard events across beaches, gardens and waterfront spots.",
-    addWeatherKey: "Open-Meteo does not require an API key for this view.",
+    usefulInfo: "Useful info",
+    openLink: "Open",
+    usefulLinksEmptyTitle: "No links yet",
+    usefulLinksEmptyBody: "Add translated entries in src/data/useful-links.json to display more useful links.",
     cachedWeather: "Showing the last cached weather snapshot.",
     weatherFetchError: "Unable to fetch weather:",
-    addTideKey: "Add VITE_API_MAREE_KEY to replace demo tides.",
+    tideApiKeyMissing: "Add an api-maree.fr key in src/data/destination.json to enable live tides.",
     noTideData: "No live tide data available.",
     cachedTides: "Showing cached tide data.",
     tideFetchError: "Unable to fetch tides:",
@@ -170,10 +158,7 @@ const messages = {
     variable: "Variable",
     gentleBreeze: "Gentle breeze",
     weatherUnavailable: "Weather unavailable",
-    desktopOnlyTitle: "The Seagulls Nest",
-    desktopOnlyBody: "The Seagulls Nest interface is available on tablet and mobile only.",
     hourlyDetails: "Day detail",
-    forecastEvery3Hours: "3h",
     nowShort: "Now",
     languageUnit: "Lang.",
     temperatureUnit: "Temp.",
@@ -185,8 +170,48 @@ const messages = {
   },
 };
 
-const initialLocale = typeof window !== "undefined" && window.localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "fr";
+function localize(value, localeCode) {
+  if (typeof value === "string") {
+    return value;
+  }
 
+  return value?.[localeCode] ?? value?.fr ?? "";
+}
+
+function getDynamicMessages(localeCode) {
+  return {
+    appName: localize(destinationConfig.app.name, localeCode),
+    cityName: localize(destinationConfig.destination.city, localeCode),
+    region: localize(destinationConfig.destination.region, localeCode),
+    storyEyebrow: localize(destinationConfig.app.storyEyebrow, localeCode),
+    storyTitle: localize(destinationConfig.app.storyTitle, localeCode),
+    storyBody: localize(destinationConfig.app.storyBody, localeCode),
+    desktopOnlyTitle: localize(destinationConfig.app.desktopOnlyTitle, localeCode),
+    desktopOnlyBody: localize(destinationConfig.app.desktopOnlyBody, localeCode),
+    metaDescription: localize(destinationConfig.app.metaDescription, localeCode),
+  };
+}
+
+function applyDocumentMetadata(localeCode) {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  document.documentElement.lang = localeCode;
+  document.title = localize(destinationConfig.app.name, localeCode);
+
+  const description = document.querySelector('meta[name="description"]');
+  if (description) {
+    description.setAttribute("content", localize(destinationConfig.app.metaDescription, localeCode));
+  }
+
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) {
+    themeColor.setAttribute("content", destinationConfig.app.themeColor);
+  }
+}
+
+const initialLocale = typeof window !== "undefined" && window.localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "fr";
 const locale = ref(initialLocale);
 
 watch(
@@ -194,14 +219,20 @@ watch(
   (value) => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEY, value);
-      document.documentElement.lang = value;
     }
+
+    applyDocumentMetadata(value);
   },
   { immediate: true },
 );
 
 export function useLocale() {
-  const t = (key) => messages[locale.value]?.[key] ?? messages.fr[key] ?? key;
+  const t = (key) => {
+    const localeMessages = messages[locale.value] ?? messages.fr;
+    const dynamicMessages = getDynamicMessages(locale.value);
+
+    return localeMessages[key] ?? dynamicMessages[key] ?? messages.fr[key] ?? getDynamicMessages("fr")[key] ?? key;
+  };
 
   return {
     locale,

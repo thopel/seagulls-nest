@@ -1,0 +1,76 @@
+{
+  "app": {
+    "name": {
+      "fr": "Le nid des mouettes",
+      "en": "The Seagulls Nest"
+    },
+    "shortName": {
+      "fr": "Nid des mouettes",
+      "en": "Seagulls Nest"
+    },
+    "metaDescription": {
+      "fr": "Compagnon météo, marées et infos locales pour Dinard.",
+      "en": "Weather, tides and local info companion for Dinard."
+    },
+    "desktopOnlyTitle": {
+      "fr": "Le nid des mouettes",
+      "en": "The Seagulls Nest"
+    },
+    "desktopOnlyBody": {
+      "fr": "L'interface du nid des mouettes est disponible uniquement sur tablette et mobile.",
+      "en": "The Seagulls Nest interface is available on tablet and mobile only."
+    },
+    "storyEyebrow": {
+      "fr": "L'esprit du lieu",
+      "en": "Sense of place"
+    },
+    "storyTitle": {
+      "fr": "Pourquoi Le nid des mouettes ?",
+      "en": "Why The Seagulls Nest?"
+    },
+    "storyBody": {
+      "fr": "Parce qu'il n'est pas rare de voir des mouettes passer sur le balcon, surtout si vous laissez traîner de la nourriture... Et dans cet appartement, comme les mouettes depuis leur nid, vous gardez toujours un oeil sur l'océan.",
+      "en": "Because it is not unusual to see seagulls stop by the balcony, especially if food is left out... And in this apartment, like seagulls from their nest, you always keep one eye on the ocean."
+    },
+    "themeColor": "#f5e4b8",
+    "backgroundColor": "#f9f1d7"
+  },
+  "destination": {
+    "city": {
+      "fr": "Dinard",
+      "en": "Dinard"
+    },
+    "region": {
+      "fr": "Côte d'Émeraude",
+      "en": "Emerald Coast"
+    },
+    "timezone": "Europe/Paris",
+    "coordinates": {
+      "lat": 48.6329,
+      "lon": -2.0625
+    },
+    "weather": {
+      "forecastDays": 16,
+      "seaForecastDays": 6
+    },
+    "tide": {
+      "maxVisualHeightMeters": 16,
+      "stepMinutes": 10,
+      "fallbackSite": {
+        "site_id": "saint-malo",
+        "name": "Saint-Malo"
+      }
+    }
+  },
+  "development": {
+    "host": "0.0.0.0",
+    "port": 5173,
+    "https": true
+  },
+  "pwa": {
+    "lang": "fr",
+    "startUrl": "/",
+    "display": "standalone",
+    "orientation": "portrait"
+  }
+}

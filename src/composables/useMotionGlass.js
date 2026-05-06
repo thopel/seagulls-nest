@@ -13,7 +13,6 @@ export function useMotionGlass() {
   const permissionState = ref('idle')
 
   let motionTimer = null
-  let armedEvents = []
   let lastSensorTimestamp = 0
   let lastGravityTimestamp = 0
   let orientationBaselineBeta = null
@@ -91,40 +90,7 @@ export function useMotionGlass() {
     window.addEventListener('deviceorientation', handleOrientation, { passive: true })
     enabled.value = true
     permissionState.value = 'granted'
-    teardownArmListeners()
     return true
-  }
-
-  const teardownArmListeners = () => {
-    for (const [eventName, listener, options] of armedEvents) {
-      window.removeEventListener(eventName, listener, options)
-    }
-    armedEvents = []
-  }
-
-  const armMotionOnFirstInteraction = () => {
-    teardownArmListeners()
-
-    const interactionOptions = { passive: true, once: true }
-    const listener = async () => {
-      try {
-        await requestMotionAccess()
-      } catch {
-        return false
-      }
-
-      return true
-    }
-
-    armedEvents = [
-      ['pointerdown', listener, interactionOptions],
-      ['touchstart', listener, interactionOptions],
-      ['click', listener, interactionOptions]
-    ]
-
-    for (const [eventName, eventListener, options] of armedEvents) {
-      window.addEventListener(eventName, eventListener, options)
-    }
   }
 
   const settleEnergy = () => {
@@ -243,7 +209,6 @@ export function useMotionGlass() {
 
       permissionState.value = granted ? 'granted' : 'denied'
       if (!granted) {
-        armMotionOnFirstInteraction()
         return false
       }
     }
@@ -270,7 +235,6 @@ export function useMotionGlass() {
       (hasOrientationSupport() && typeof DeviceOrientationEvent.requestPermission === 'function')
     ) {
       permissionState.value = 'prompt'
-      armMotionOnFirstInteraction()
       return
     }
 
@@ -288,7 +252,6 @@ export function useMotionGlass() {
     }
 
     window.clearTimeout(motionTimer)
-    teardownArmListeners()
   })
 
   return {

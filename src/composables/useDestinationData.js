@@ -1,5 +1,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
-import events from '../data/events.json'
+import destinationConfig from '../data/destination.json'
+import usefulLinksData from '../data/useful-links.json'
 import clearDaySvg from '@meteocons/svg/fill/clear-day.svg'
 import clearNightSvg from '@meteocons/svg/fill/clear-night.svg'
 import cloudySvg from '@meteocons/svg/fill/cloudy.svg'
@@ -20,19 +21,9 @@ import snowSvg from '@meteocons/svg/fill/snow.svg'
 import thunderstormsRainSvg from '@meteocons/svg/fill/thunderstorms-rain.svg'
 import thunderstormsSvg from '@meteocons/svg/fill/thunderstorms.svg'
 
-const DINARD = {
-  name: 'Dinard',
-  lat: 48.6329,
-  lon: -2.0625,
-  timezone: 'Europe/Paris'
-}
-
-const MAX_WATER_HEIGHT = 16
-const PUBLIC_TIDE_EXAMPLE_KEY = '24df43ed9155cae245fa8fa8ca93bb7d'
-const FALLBACK_TIDE_SITE = {
-  site_id: 'saint-malo',
-  name: 'Saint-Malo'
-}
+const DESTINATION = destinationConfig.destination
+const MAX_WATER_HEIGHT = DESTINATION.tide.maxVisualHeightMeters
+const FALLBACK_TIDE_SITE = DESTINATION.tide.fallbackSite
 
 const METEOCONS = {
   clearDay: clearDaySvg,
@@ -94,7 +85,7 @@ function mapSeaTemperatureDays(hourly) {
 
 function toDateKey(value) {
   return new Intl.DateTimeFormat('fr-CA', {
-    timeZone: DINARD.timezone,
+    timeZone: DESTINATION.timezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
@@ -112,7 +103,7 @@ function parseDateKey(key) {
 
 function toHourMinute(value, locale) {
   return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'fr-FR', {
-    timeZone: DINARD.timezone,
+    timeZone: DESTINATION.timezone,
     hour: '2-digit',
     minute: '2-digit',
     hour12: locale === 'en'
@@ -122,7 +113,7 @@ function toHourMinute(value, locale) {
 function getLocalHour(value) {
   return Number(
     new Intl.DateTimeFormat('en-GB', {
-      timeZone: DINARD.timezone,
+      timeZone: DESTINATION.timezone,
       hour: '2-digit',
       hour12: false
     }).format(value)
@@ -131,7 +122,7 @@ function getLocalHour(value) {
 
 function getIsoAtLocalTime(date, hour, minute) {
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: DINARD.timezone,
+    timeZone: DESTINATION.timezone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit'
@@ -379,7 +370,7 @@ function mapForecastTimeline(hourly, locale, t) {
       label: new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'fr-FR', {
         hour: '2-digit',
         minute: '2-digit',
-        timeZone: DINARD.timezone,
+        timeZone: DESTINATION.timezone,
         hour12: locale === 'en'
       }).format(date),
       temp: hourly?.temperature_2m?.[index] ?? null,
@@ -422,12 +413,12 @@ function mapForecastDays(daily, hourlyEntries, locale, t) {
         weekday: 'short',
         day: 'numeric',
         month: 'short',
-        timeZone: DINARD.timezone
+        timeZone: DESTINATION.timezone
       }).format(date),
       shortLabel: new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'fr-FR', {
         weekday: 'short',
         day: 'numeric',
-        timeZone: DINARD.timezone
+        timeZone: DESTINATION.timezone
       }).format(date),
       temp: midday?.temp ?? Math.round(((daily?.temperature_2m_min?.[index] ?? 0) + (daily?.temperature_2m_max?.[index] ?? 0)) / 2),
       minTemp: daily?.temperature_2m_min?.[index] ?? null,
@@ -473,7 +464,7 @@ function mapWeather(payload, locale, t) {
   const meta = getWeatherCodeMeta(current.weather_code, current.is_day === 1, locale, t)
 
   return {
-    city: DINARD.name,
+    city: localizeText(DESTINATION.city, locale),
     condition: meta.condition,
     temp: current.temperature_2m ?? null,
     minTemp: currentDay?.minTemp ?? null,
@@ -501,7 +492,7 @@ function formatSelectedDate(date, locale) {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-    timeZone: DINARD.timezone
+    timeZone: DESTINATION.timezone
   }).format(date)
 }
 
@@ -531,17 +522,33 @@ async function fetchJson(url) {
   return response.json()
 }
 
-function localizeEvent(entry, locale) {
-  return {
-    ...entry,
-    title: entry.title?.[locale] ?? entry.title?.fr ?? '',
-    description: entry.description?.[locale] ?? entry.description?.fr ?? '',
-    location: entry.location?.[locale] ?? entry.location?.fr ?? '',
-    tag: entry.tag?.[locale] ?? entry.tag?.fr ?? ''
+function localizeText(value, locale) {
+  if (typeof value === 'string') {
+    return value
+  }
+
+  return value?.[locale] ?? value?.fr ?? ''
+}
+
+function getHostname(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
   }
 }
 
-export function useDinardData(locale, t) {
+function localizeUsefulLink(entry, locale) {
+  return {
+    ...entry,
+    title: localizeText(entry.title, locale),
+    description: localizeText(entry.description, locale),
+    tag: localizeText(entry.tag, locale),
+    sourceLabel: getHostname(entry.url)
+  }
+}
+
+export function useDestinationData(locale, t) {
   const weather = ref(null)
   const weatherError = ref('')
   const weatherLoading = ref(true)
@@ -570,7 +577,6 @@ export function useDinardData(locale, t) {
 
   const selectedDateKey = computed(() => toDateKey(selectedDate.value))
   const currentDateKey = toDateKey(today)
-  const currentLabel = computed(() => formatSelectedDate(today, locale.value))
   const selectedLabel = computed(() => formatSelectedDate(selectedDate.value, locale.value))
   const isSelectedToday = computed(() => selectedDateKey.value === toDateKey(today))
   const currentWeather = computed(() => weather.value)
@@ -616,16 +622,6 @@ export function useDinardData(locale, t) {
       sunrise: forecastDay.sunrise,
       sunset: forecastDay.sunset
     }
-  })
-
-  const selectedSeaTemperature = computed(() => {
-    if (isSelectedToday.value && currentSeaTemperature.value !== null) {
-      return currentSeaTemperature.value
-    }
-
-    return (
-      seaTemperatureDays.value.find((entry) => entry.key === selectedDateKey.value)?.value ?? null
-    )
   })
 
   const nowEquivalent = computed(() => {
@@ -738,14 +734,8 @@ export function useDinardData(locale, t) {
     return null
   })
 
-  const eventsForDay = computed(() =>
-    events
-      .filter((entry) => {
-        const startKey = toDateKey(new Date(entry.start))
-        const endKey = toDateKey(new Date(entry.end))
-        return startKey <= selectedDateKey.value && endKey >= selectedDateKey.value
-      })
-      .map((entry) => localizeEvent(entry, locale.value))
+  const usefulLinks = computed(() =>
+    usefulLinksData.map((entry) => localizeUsefulLink(entry, locale.value))
   )
 
   const selectedWeatherTimeline = computed(() => {
@@ -787,18 +777,17 @@ export function useDinardData(locale, t) {
     return hasNearbyForecast ? slots : [currentSlot, ...slots]
   })
 
-  const getTideApiKey = () => import.meta.env.VITE_API_MAREE_KEY || PUBLIC_TIDE_EXAMPLE_KEY
+  const getTideApiKey = () => import.meta.env.VITE_API_MAREE_KEY
 
   async function fetchTideSeriesForDate(targetDate, targetKey) {
-    const envKey = import.meta.env.VITE_API_MAREE_KEY
     const key = getTideApiKey()
-    const cacheKey = `le-nid-tides-${targetKey}`
+    const cacheKey = `coastal-companion-tides-${targetKey}`
 
     if (!key) {
       return {
         series: [],
         source: 'none',
-        error: t('addTideKey')
+        error: t('tideApiKeyMissing')
       }
     }
 
@@ -806,7 +795,7 @@ export function useDinardData(locale, t) {
       const from = getIsoAtLocalTime(targetDate, 0, 0)
       const to = getIsoAtLocalTime(targetDate, 23, 59)
       const payload = await fetchJson(
-        `https://api-maree.fr/water-levels?site=${tideSite.value.site_id}&from=${from}&to=${to}&step=10&tz=${DINARD.timezone}&key=${encodeURIComponent(key)}`
+        `https://api-maree.fr/water-levels?site=${tideSite.value.site_id}&from=${from}&to=${to}&step=${DESTINATION.tide.stepMinutes}&tz=${DESTINATION.timezone}&key=${encodeURIComponent(key)}`
       )
 
       const series = payload.data ?? []
@@ -817,7 +806,7 @@ export function useDinardData(locale, t) {
 
       return {
         series,
-        source: envKey ? 'api' : 'example',
+        source: 'api',
         error: ''
       }
     } catch (error) {
@@ -841,11 +830,11 @@ export function useDinardData(locale, t) {
 
   async function loadSeaTemperature() {
     seaTemperatureError.value = ''
-    const cacheKey = 'le-nid-sea-temperature'
+    const cacheKey = 'coastal-companion-sea-temperature'
 
     try {
       const payload = await fetchJson(
-        `https://marine-api.open-meteo.com/v1/marine?latitude=${DINARD.lat}&longitude=${DINARD.lon}&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=${encodeURIComponent(DINARD.timezone)}&forecast_days=6&cell_selection=sea`
+        `https://marine-api.open-meteo.com/v1/marine?latitude=${DESTINATION.coordinates.lat}&longitude=${DESTINATION.coordinates.lon}&current=sea_surface_temperature&hourly=sea_surface_temperature&timezone=${encodeURIComponent(DESTINATION.timezone)}&forecast_days=${DESTINATION.weather.seaForecastDays}&cell_selection=sea`
       )
 
       currentSeaTemperature.value =
@@ -874,11 +863,11 @@ export function useDinardData(locale, t) {
     weatherLoading.value = true
     weatherError.value = ''
 
-    const cacheKey = `le-nid-weather-${locale.value}`
+    const cacheKey = `coastal-companion-weather-${locale.value}`
 
     try {
       const payload = await fetchJson(
-        `https://api.open-meteo.com/v1/forecast?latitude=${DINARD.lat}&longitude=${DINARD.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,precipitation,weather_code,pressure_msl,cloud_cover,visibility,wind_speed_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&timezone=${encodeURIComponent(DINARD.timezone)}&forecast_days=16`
+        `https://api.open-meteo.com/v1/forecast?latitude=${DESTINATION.coordinates.lat}&longitude=${DESTINATION.coordinates.lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,pressure_msl,cloud_cover,wind_speed_10m&hourly=temperature_2m,apparent_temperature,relative_humidity_2m,precipitation_probability,precipitation,weather_code,pressure_msl,cloud_cover,visibility,wind_speed_10m,is_day&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&timezone=${encodeURIComponent(DESTINATION.timezone)}&forecast_days=${DESTINATION.weather.forecastDays}`
       )
 
       weather.value = mapWeather(payload, locale.value, t)
@@ -918,7 +907,7 @@ export function useDinardData(locale, t) {
       const payload = await fetchJson(`https://api-maree.fr/sites?key=${encodeURIComponent(key)}`)
       const nearest = payload.sites.reduce((best, site) => {
         const distance =
-          Math.abs(site.latitude - DINARD.lat) + Math.abs(site.longitude - DINARD.lon)
+          Math.abs(site.latitude - DESTINATION.coordinates.lat) + Math.abs(site.longitude - DESTINATION.coordinates.lon)
         if (!best || distance < best.distance) {
           return {
             distance,
@@ -977,18 +966,15 @@ export function useDinardData(locale, t) {
   })
 
   return {
-    currentLabel,
     currentSeaTemperature,
     currentTideClock,
     currentTideCurrent,
     currentWaterRatio,
     currentWeather,
-    eventsForDay,
     selectedDate,
     selectedDateInput,
     selectedDateOptions,
     selectedLabel,
-    selectedSeaTemperature,
     selectedWeather,
     selectedWeatherTimeline,
     seaTemperatureError,
@@ -1003,6 +989,7 @@ export function useDinardData(locale, t) {
     tideSite,
     tideSource,
     tideTurns,
+    usefulLinks,
     waterRatio,
     weather,
     weatherError,

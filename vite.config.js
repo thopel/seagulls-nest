@@ -1,13 +1,22 @@
+import { readFileSync } from 'node:fs'
 import vue from '@vitejs/plugin-vue'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const destinationConfig = JSON.parse(
+  readFileSync(new URL('./src/data/destination.json', import.meta.url), 'utf8')
+)
+
+const appConfig = destinationConfig.app
+const devConfig = destinationConfig.development
+const pwaConfig = destinationConfig.pwa
+
 export default {
   server: {
-    host: '0.0.0.0',
-    port: 5173,
-    https: true
+    host: devConfig.host,
+    port: devConfig.port,
+    https: devConfig.https
   },
   plugins: [
     vue(),
@@ -17,15 +26,15 @@ export default {
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon.svg'],
       manifest: {
-        name: 'Le nid des mouettes',
-        short_name: 'Nid des mouettes',
-        description: 'Meteo, marees et sorties a Dinard dans une ambiance Animal Crossing.',
-        theme_color: '#f5e4b8',
-        background_color: '#f9f1d7',
-        display: 'standalone',
-        orientation: 'portrait',
-        start_url: '/',
-        lang: 'fr',
+        name: appConfig.name.fr,
+        short_name: appConfig.shortName.fr,
+        description: appConfig.metaDescription.fr,
+        theme_color: appConfig.themeColor,
+        background_color: appConfig.backgroundColor,
+        display: pwaConfig.display,
+        orientation: pwaConfig.orientation,
+        start_url: pwaConfig.startUrl,
+        lang: pwaConfig.lang,
         icons: [
           {
             src: '/icon.svg',
@@ -39,17 +48,17 @@ export default {
         globPatterns: ['**/*.{js,css,html,svg,json,png,webp}'],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/api\.openweathermap\.org\/.*/i,
+            urlPattern: /^https:\/\/api\.open-meteo\.com\/.*/i,
             handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'openweather-cache'
+              cacheName: 'open-meteo-cache'
             }
           },
           {
-            urlPattern: /^https:\/\/openweathermap\.org\/img\/wn\/.*/i,
-            handler: 'CacheFirst',
+            urlPattern: /^https:\/\/marine-api\.open-meteo\.com\/.*/i,
+            handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'openweather-icons'
+              cacheName: 'open-meteo-marine-cache'
             }
           },
           {
