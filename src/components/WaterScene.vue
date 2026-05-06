@@ -40,6 +40,10 @@ const NEST_AWAKE_SRC = "/assets/seegulls-nest-awake.png";
 const NEST_ASLEEP_SRC = "/assets/seegulls-nest-asleep.png";
 
 const props = defineProps({
+  hideNest: {
+    type: Boolean,
+    default: false,
+  },
   skyColor: {
     type: String,
     default: "#8dc9f8",
@@ -378,7 +382,7 @@ onBeforeUnmount(() => {
         <path class="water-fill-back" :d="deepWaterPath" />
       </svg>
 
-      <img v-if="floatingNest && floatingNestStyle" class="water-float-nest" :src="floatingNest.href" alt="" :style="floatingNestStyle" />
+      <img v-if="!hideNest && floatingNest && floatingNestStyle" class="water-float-nest" :src="floatingNest.href" alt="" :style="floatingNestStyle" />
 
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="water-svg" aria-hidden="true">
         <defs>

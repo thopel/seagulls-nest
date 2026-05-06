@@ -1,6 +1,66 @@
 [
   {
     "title": {
+      "fr": "Yoga Sunrise sur la Plage",
+      "en": "Sunrise Beach Yoga"
+    },
+    "tag": {
+      "fr": "Bien-etre",
+      "en": "Wellness"
+    },
+    "start": "2026-05-06T07:30:00+02:00",
+    "end": "2026-05-06T08:30:00+02:00",
+    "description": {
+      "fr": "Seance douce face a la mer avec respiration, etirements et vue sur la baie des le lever du jour.",
+      "en": "A gentle seaside session with breathing, stretching and bay views from first light."
+    },
+    "location": {
+      "fr": "Plage de l'Ecluse",
+      "en": "Ecluse Beach"
+    }
+  },
+  {
+    "title": {
+      "fr": "Apero Jazz sur la Terrasse",
+      "en": "Jazz Sundowner on the Terrace"
+    },
+    "tag": {
+      "fr": "Musique",
+      "en": "Music"
+    },
+    "start": "2026-05-06T18:30:00+02:00",
+    "end": "2026-05-06T20:30:00+02:00",
+    "description": {
+      "fr": "Petit ensemble jazz, vue sur le front de mer et ambiance de debut de soiree.",
+      "en": "Small jazz ensemble, waterfront views and a relaxed early evening atmosphere."
+    },
+    "location": {
+      "fr": "Casino de Dinard",
+      "en": "Dinard Casino"
+    }
+  },
+  {
+    "title": {
+      "fr": "Marche Photo des Villas",
+      "en": "Seaside Villas Photo Walk"
+    },
+    "tag": {
+      "fr": "Photo",
+      "en": "Photo"
+    },
+    "start": "2026-05-07T10:00:00+02:00",
+    "end": "2026-05-07T12:00:00+02:00",
+    "description": {
+      "fr": "Balade guidee pour capter les facades, bow-windows et points de vue iconiques de Dinard.",
+      "en": "Guided walk to capture Dinard's facades, bay windows and iconic viewpoints."
+    },
+    "location": {
+      "fr": "Pointe du Moulinet",
+      "en": "Moulinet Point"
+    }
+  },
+  {
+    "title": {
       "fr": "Marche du Clair de Lune",
       "en": "Moonlight Walk"
     },
@@ -17,6 +77,26 @@
     "location": {
       "fr": "Promenade du Clair de Lune",
       "en": "Moonlight Promenade"
+    }
+  },
+  {
+    "title": {
+      "fr": "Degustation Huitres & Vins Blancs",
+      "en": "Oyster & White Wine Tasting"
+    },
+    "tag": {
+      "fr": "Gastronomie",
+      "en": "Food"
+    },
+    "start": "2026-05-08T18:00:00+02:00",
+    "end": "2026-05-08T19:30:00+02:00",
+    "description": {
+      "fr": "Accords marins autour des produits de la baie avec explications de producteurs invites.",
+      "en": "Sea-inspired pairings built around bay produce with invited local producers."
+    },
+    "location": {
+      "fr": "Halles de Dinard",
+      "en": "Dinard Market Hall"
     }
   },
   {
@@ -41,6 +121,26 @@
   },
   {
     "title": {
+      "fr": "Lecture Conte Marin au Port",
+      "en": "Harbor Sea Story Reading"
+    },
+    "tag": {
+      "fr": "Lecture",
+      "en": "Reading"
+    },
+    "start": "2026-05-09T17:30:00+02:00",
+    "end": "2026-05-09T18:15:00+02:00",
+    "description": {
+      "fr": "Pause familiale avec recits de mer et selection de livres inspires des oiseaux et des traverses.",
+      "en": "Family-friendly pause with sea tales and a selection inspired by seabirds and crossings."
+    },
+    "location": {
+      "fr": "Port de Dinard",
+      "en": "Dinard Harbor"
+    }
+  },
+  {
+    "title": {
       "fr": "Atelier Cerf-Volant en Famille",
       "en": "Family Kite Workshop"
     },
@@ -61,6 +161,126 @@
   },
   {
     "title": {
+      "fr": "Set Electro Sunset",
+      "en": "Sunset Electro Set"
+    },
+    "tag": {
+      "fr": "Soiree",
+      "en": "Nightlife"
+    },
+    "start": "2026-05-10T19:30:00+02:00",
+    "end": "2026-05-10T22:00:00+02:00",
+    "description": {
+      "fr": "DJ set doux face a la mer avec transats, mocktails et coucher de soleil sur la baie.",
+      "en": "Gentle DJ set by the sea with deckchairs, mocktails and sunset over the bay."
+    },
+    "location": {
+      "fr": "Digue de l'Ecluse",
+      "en": "Ecluse Seawall"
+    }
+  },
+  {
+    "title": {
+      "fr": "Atelier Aquarelle de Bord de Mer",
+      "en": "Seaside Watercolor Workshop"
+    },
+    "tag": {
+      "fr": "Atelier",
+      "en": "Workshop"
+    },
+    "start": "2026-05-11T15:00:00+02:00",
+    "end": "2026-05-11T17:00:00+02:00",
+    "description": {
+      "fr": "Initiation a l'aquarelle en exterieur pour saisir ciel, reflets et villas depuis la promenade.",
+      "en": "Outdoor watercolor introduction focused on skies, reflections and villas from the promenade."
+    },
+    "location": {
+      "fr": "Promenade du Clair de Lune",
+      "en": "Moonlight Promenade"
+    }
+  },
+  {
+    "title": {
+      "fr": "Visite Architecture Belle Epoque",
+      "en": "Belle Epoque Architecture Tour"
+    },
+    "tag": {
+      "fr": "Patrimoine",
+      "en": "Heritage"
+    },
+    "start": "2026-05-12T11:00:00+02:00",
+    "end": "2026-05-12T12:45:00+02:00",
+    "description": {
+      "fr": "Parcours commente autour des villas emblématiques et de l'histoire balneaire de Dinard.",
+      "en": "Commented route around landmark villas and Dinard's seaside history."
+    },
+    "location": {
+      "fr": "Devant l'Office de tourisme",
+      "en": "Outside the Tourist Office"
+    }
+  },
+  {
+    "title": {
+      "fr": "Marche des Producteurs de la Baie",
+      "en": "Bay Producers Market"
+    },
+    "tag": {
+      "fr": "Marche",
+      "en": "Market"
+    },
+    "start": "2026-05-13T09:00:00+02:00",
+    "end": "2026-05-13T14:00:00+02:00",
+    "description": {
+      "fr": "Producteurs locaux, legumes de saison, douceurs bretonnes et produits marins en direct.",
+      "en": "Local producers, seasonal vegetables, Breton sweets and fresh sea produce."
+    },
+    "location": {
+      "fr": "Place du Marche",
+      "en": "Market Square"
+    }
+  },
+  {
+    "title": {
+      "fr": "Projection Documentaire Ocean",
+      "en": "Ocean Documentary Screening"
+    },
+    "tag": {
+      "fr": "Cinema",
+      "en": "Cinema"
+    },
+    "start": "2026-05-13T20:30:00+02:00",
+    "end": "2026-05-13T22:00:00+02:00",
+    "description": {
+      "fr": "Projection suivie d'un echange autour du littoral, des courants et de la biodiversite marine.",
+      "en": "Screening followed by a discussion on coastlines, currents and marine biodiversity."
+    },
+    "location": {
+      "fr": "Palais des Arts",
+      "en": "Arts Hall"
+    }
+  },
+  {
+    "title": {
+      "fr": "Session Paddle au Matin",
+      "en": "Morning Paddle Session"
+    },
+    "tag": {
+      "fr": "Sport",
+      "en": "Sport"
+    },
+    "start": "2026-05-14T08:00:00+02:00",
+    "end": "2026-05-14T09:30:00+02:00",
+    "description": {
+      "fr": "Sortie encadree pour profiter d'une mer calme et observer la baie au petit matin.",
+      "en": "Guided outing to enjoy calm water and watch the bay early in the morning."
+    },
+    "location": {
+      "fr": "Plage du Prieure",
+      "en": "Prieure Beach"
+    }
+  },
+  {
+    "title": {
       "fr": "Concert Sunset sur la Digue",
       "en": "Sunset Concert on the Seawall"
     },
@@ -77,6 +297,26 @@
     "location": {
       "fr": "Digue de l'Ecluse",
       "en": "Ecluse Seawall"
+    }
+  },
+  {
+    "title": {
+      "fr": "Nuit des Galeries",
+      "en": "Gallery Night"
+    },
+    "tag": {
+      "fr": "Art",
+      "en": "Art"
+    },
+    "start": "2026-05-15T18:00:00+02:00",
+    "end": "2026-05-15T23:00:00+02:00",
+    "description": {
+      "fr": "Parcours libre dans plusieurs galeries et ateliers avec rencontres d'artistes et verres de bienvenue.",
+      "en": "Open route across galleries and studios with artist meetups and welcome drinks."
+    },
+    "location": {
+      "fr": "Centre-ville de Dinard",
+      "en": "Dinard Town Center"
     }
   },
   {

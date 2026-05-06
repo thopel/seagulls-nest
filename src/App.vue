@@ -6,6 +6,7 @@ import { useLocale } from "./composables/useLocale";
 import { useMotionGlass } from "./composables/useMotionGlass";
 
 const { locale, localeOptions, t } = useLocale();
+const DESKTOP_SLEEPING_NEST_SRC = "/assets/seegulls-nest-asleep.png";
 
 const TEMPERATURE_UNIT_KEY = "le-nid-temperature-unit";
 const DISTANCE_UNIT_KEY = "le-nid-distance-unit";
@@ -224,10 +225,6 @@ const selectedWeatherStats = computed(() => [
     key: "pressure",
     value: formatPressure(selectedWeather.value?.pressure),
   },
-  {
-    key: "rainfall",
-    value: formatPrecipitation(selectedWeather.value?.precipitationMm),
-  },
 ]);
 
 function getSkyPalette(iconCode, isSunVisible) {
@@ -347,7 +344,7 @@ function selectAvailableDay(key) {
 
 <template>
   <div class="min-h-[100dvh] bg-page text-stone-800" :style="pageStyle">
-    <main class="mx-auto flex max-w-6xl flex-col gap-4 lg:grid lg:grid-cols-[minmax(320px,390px)_1fr]">
+    <main class="mx-auto flex max-w-6xl flex-col gap-4 lg:hidden">
       <section class="phone-shell relative isolate shadow-shell">
         <WaterScene :sky-color="skyPalette.phone" :water-ratio="currentWaterRatio" :tilt-x="tiltX" :tilt-y="tiltY" :energy="energy" />
 
@@ -610,14 +607,14 @@ function selectAvailableDay(key) {
                   </p>
                 </div>
 
-                <div class="rounded-[1.3rem] bg-white/75 px-4 py-3 text-right shadow-inner-soft">
+                <div class="rounded-[1.3rem] bg-white/75 px-4 py-3 text-right">
                   <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("rainfall") }}</p>
                   <p class="mt-1 font-display text-2xl text-stone-800">{{ formatPrecipitation(selectedWeather?.precipitationMm) }}</p>
                 </div>
               </div>
 
               <div class="mt-4 grid grid-cols-2 gap-2">
-                <article v-for="item in selectedWeatherStats" :key="item.key" class="glass-tile">
+                <article v-for="item in selectedWeatherStats" :key="item.key" class="glass-tile day-detail-tile">
                   <p class="text-lg font-display text-stone-800">{{ item.value }}</p>
                   <p class="mt-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-stone-600">
                     {{ t(item.key) }}
@@ -625,10 +622,7 @@ function selectAvailableDay(key) {
                 </article>
               </div>
 
-              <div
-                v-if="selectedWeather?.sunrise || selectedWeather?.sunset"
-                class="mt-4 grid grid-cols-2 gap-2 rounded-[1.4rem] bg-white/70 p-3 shadow-inner-soft"
-              >
+              <div v-if="selectedWeather?.sunrise || selectedWeather?.sunset" class="mt-4 grid grid-cols-2 gap-2 rounded-[1.4rem] bg-white/70 p-3">
                 <div>
                   <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("sunrise") }}</p>
                   <p class="mt-1 font-display text-xl text-stone-800">
@@ -699,12 +693,7 @@ function selectAvailableDay(key) {
               <div>
                 <p class="eyebrow">{{ t("localOutings") }}</p>
                 <h2 class="panel-title">{{ t("cityAgenda") }}</h2>
-                <p class="mt-2 text-sm text-stone-500">{{ t("agendaForDate") }}</p>
               </div>
-              <p class="note-chip">
-                {{ eventsForDay.length }}
-                {{ eventsForDay.length > 1 ? t("eventCountPlural") : t("eventCount") }}
-              </p>
             </div>
 
             <div class="mt-5 grid gap-3 md:grid-cols-2">
@@ -755,5 +744,16 @@ function selectAvailableDay(key) {
         </article>
       </section>
     </main>
+
+    <section class="desktop-shell hidden lg:flex">
+      <WaterScene :hide-nest="true" :sky-color="skyPalette.phone" :water-ratio="0.52" :tilt-x="0" :tilt-y="0" :energy="0" />
+      <div class="desktop-overlay">
+        <img :src="DESKTOP_SLEEPING_NEST_SRC" alt="" class="desktop-nest" aria-hidden="true" />
+        <div class="desktop-message">
+          <p class="desktop-title">{{ t("desktopOnlyTitle") }}</p>
+          <p class="desktop-body">{{ t("desktopOnlyBody") }}</p>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
