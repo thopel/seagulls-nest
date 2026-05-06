@@ -250,14 +250,18 @@ button {
 }
 
 .weather-hero-icon {
-  font-size: 4rem;
+  width: 4.75rem;
+  height: 4.75rem;
   flex-shrink: 0;
-  text-shadow: 0 10px 24px rgba(32, 37, 49, 0.18);
+  object-fit: contain;
+  filter: drop-shadow(0 10px 24px rgba(32, 37, 49, 0.18));
 }
 
 .weather-panel-icon {
-  font-size: 3.25rem;
+  width: 4.1rem;
+  height: 4.1rem;
   flex-shrink: 0;
+  object-fit: contain;
   filter: drop-shadow(0 0.35rem 0.45rem rgba(75, 174, 177, 0.14));
 }
 
@@ -315,8 +319,10 @@ button {
 }
 
 .hourly-weather-icon {
-  font-size: 2rem;
+  width: 2.4rem;
+  height: 2.4rem;
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .phone-floating-stack {
@@ -575,6 +581,18 @@ button {
   font-size: 0.72rem;
   font-weight: 700;
   color: white;
+}
+
+.event-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(75, 174, 177, 0.24);
+  background: rgba(75, 174, 177, 0.14);
+  padding: 0.3rem 0.72rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #2c7e8c;
 }
 
 .day-pill {

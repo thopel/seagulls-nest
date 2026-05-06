@@ -1,15 +1,5 @@
 <script setup>
 import { computed, ref, watch } from "vue";
-import { Icon } from "@iconify/vue";
-import sunIcon from "@iconify-icons/noto/sun";
-import crescentMoonIcon from "@iconify-icons/noto/crescent-moon";
-import cloudIcon from "@iconify-icons/noto/cloud";
-import cloudWithRainIcon from "@iconify-icons/noto/cloud-with-rain";
-import cloudWithSnowIcon from "@iconify-icons/noto/cloud-with-snow";
-import cloudWithLightningAndRainIcon from "@iconify-icons/noto/cloud-with-lightning-and-rain";
-import fogIcon from "@iconify-icons/noto/fog";
-import sunBehindSmallCloudIcon from "@iconify-icons/noto/sun-behind-small-cloud";
-import sunBehindRainCloudIcon from "@iconify-icons/noto/sun-behind-rain-cloud";
 import WaterScene from "./components/WaterScene.vue";
 import { useDinardData } from "./composables/useDinardData";
 import { useLocale } from "./composables/useLocale";
@@ -24,30 +14,24 @@ const temperatureUnit = ref(typeof window !== "undefined" && window.localStorage
 const distanceUnit = ref(typeof window !== "undefined" && window.localStorage.getItem(DISTANCE_UNIT_KEY) === "imperial" ? "imperial" : "metric");
 
 const {
-  currentLabel,
   currentSeaTemperature,
   currentTideClock,
   currentTideCurrent,
   currentWaterRatio,
   currentWeather,
-  dateMax,
-  dateMin,
   eventsForDay,
-  selectedDate,
   selectedDateInput,
+  selectedDateOptions,
   selectedLabel,
   selectedWeather,
   selectedWeatherTimeline,
   seaTemperatureError,
-  tideClock,
-  tideCurrent,
   tideEvents,
   tideError,
   tideGraph,
   tideLoading,
   tideNowMarker,
   tideSeries,
-  tideSite,
   weatherError,
   weatherLoading,
   helpers,
@@ -185,37 +169,6 @@ function formatTempRange(minValue, maxValue) {
   return `${formatTemperature(minValue)}° / ${formatTemperature(maxValue)}°`;
 }
 
-function parseDateInput(value) {
-  const [year, month, day] = String(value ?? "")
-    .split("-")
-    .map(Number);
-
-  if (!year || !month || !day) {
-    return null;
-  }
-
-  return new Date(year, month - 1, day, 12, 0, 0, 0);
-}
-
-function formatMonthLabel(value, activeLocale) {
-  const label = new Intl.DateTimeFormat(activeLocale === "en" ? "en-GB" : "fr-FR", {
-    month: "long",
-    year: "numeric",
-  }).format(value);
-
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-function formatWeekdayLabel(value, activeLocale) {
-  return new Intl.DateTimeFormat(activeLocale === "en" ? "en-GB" : "fr-FR", {
-    weekday: "short",
-  })
-    .format(value)
-    .replace(".", "")
-    .slice(0, 3)
-    .toUpperCase();
-}
-
 const stats = computed(() => [
   {
     key: "humidity",
@@ -231,7 +184,9 @@ const stats = computed(() => [
   },
 ]);
 
-const selectedWeatherConditionLabel = computed(() => (weatherLoading.value ? t("gentleBreeze") : (selectedWeather.value?.condition ?? t("gentleBreeze"))));
+const selectedWeatherConditionLabel = computed(() =>
+  weatherLoading.value ? t("gentleBreeze") : (selectedWeather.value?.condition ?? t("weatherUnavailable")),
+);
 
 const selectedWeatherStats = computed(() => [
   {
@@ -275,85 +230,6 @@ const selectedWeatherStats = computed(() => [
   },
 ]);
 
-const minSelectableDate = computed(() => parseDateInput(dateMin.value));
-const maxSelectableDate = computed(() => parseDateInput(dateMax.value));
-const visibleMonthDate = ref(new Date(selectedDate.value.getFullYear(), selectedDate.value.getMonth(), 1, 12, 0, 0, 0));
-
-watch(
-  selectedDate,
-  (value) => {
-    if (value.getFullYear() !== visibleMonthDate.value.getFullYear() || value.getMonth() !== visibleMonthDate.value.getMonth()) {
-      visibleMonthDate.value = new Date(value.getFullYear(), value.getMonth(), 1, 12, 0, 0, 0);
-    }
-  },
-  { immediate: true },
-);
-
-const calendarMonthLabel = computed(() => formatMonthLabel(visibleMonthDate.value, locale.value));
-const weekdayLabels = computed(() => {
-  const monday = new Date(2026, 0, 5, 12, 0, 0, 0);
-  return Array.from({ length: 7 }, (_, index) => {
-    const day = new Date(monday);
-    day.setDate(monday.getDate() + index);
-    return formatWeekdayLabel(day, locale.value);
-  });
-});
-
-const canGoPreviousMonth = computed(() => {
-  const minDate = minSelectableDate.value;
-  if (!minDate) {
-    return false;
-  }
-
-  const previousMonth = new Date(visibleMonthDate.value.getFullYear(), visibleMonthDate.value.getMonth() - 1, 1, 12, 0, 0, 0);
-  const previousMonthEnd = new Date(previousMonth.getFullYear(), previousMonth.getMonth() + 1, 0, 12, 0, 0, 0);
-  return previousMonthEnd >= minDate;
-});
-
-const canGoNextMonth = computed(() => {
-  const maxDate = maxSelectableDate.value;
-  if (!maxDate) {
-    return false;
-  }
-
-  const nextMonth = new Date(visibleMonthDate.value.getFullYear(), visibleMonthDate.value.getMonth() + 1, 1, 12, 0, 0, 0);
-  return nextMonth <= maxDate;
-});
-
-const calendarCells = computed(() => {
-  const year = visibleMonthDate.value.getFullYear();
-  const month = visibleMonthDate.value.getMonth();
-  const firstDay = new Date(year, month, 1, 12, 0, 0, 0);
-  const firstWeekday = (firstDay.getDay() + 6) % 7;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const minDate = minSelectableDate.value;
-  const maxDate = maxSelectableDate.value;
-
-  return Array.from({ length: 42 }, (_, index) => {
-    const dayNumber = index - firstWeekday + 1;
-    if (dayNumber < 1 || dayNumber > daysInMonth) {
-      return {
-        key: `empty-${index}`,
-        empty: true,
-      };
-    }
-
-    const date = new Date(year, month, dayNumber, 12, 0, 0, 0);
-    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-    const selectable = (!minDate || date >= minDate) && (!maxDate || date <= maxDate);
-
-    return {
-      key,
-      date,
-      dayNumber,
-      empty: false,
-      selectable,
-      selected: key === selectedDateInput.value,
-      today: key === dateMin.value,
-    };
-  });
-});
-
 function getSkyPalette(iconCode, isSunVisible) {
   const icon = iconCode ?? "01d";
   const code = icon.slice(0, 2);
@@ -389,32 +265,6 @@ function extractIconCode(iconValue) {
 
   const match = iconValue.match(/(\d{2}[dn])@2x/);
   return match?.[1] ?? "01d";
-}
-
-function getWeatherIcon(iconValue) {
-  const iconCode = extractIconCode(iconValue);
-  const map = {
-    "01d": sunIcon,
-    "01n": crescentMoonIcon,
-    "02d": sunBehindSmallCloudIcon,
-    "02n": cloudIcon,
-    "03d": cloudIcon,
-    "03n": cloudIcon,
-    "04d": cloudIcon,
-    "04n": cloudIcon,
-    "09d": cloudWithRainIcon,
-    "09n": cloudWithRainIcon,
-    "10d": sunBehindRainCloudIcon,
-    "10n": cloudWithRainIcon,
-    "11d": cloudWithLightningAndRainIcon,
-    "11n": cloudWithLightningAndRainIcon,
-    "13d": cloudWithSnowIcon,
-    "13n": cloudWithSnowIcon,
-    "50d": fogIcon,
-    "50n": fogIcon,
-  };
-
-  return map[iconCode] ?? sunBehindSmallCloudIcon;
 }
 
 const isSunVisible = computed(() => {
@@ -490,28 +340,8 @@ function resetTideChartSelection() {
   selectedTideIndex.value = null;
 }
 
-function goToPreviousMonth() {
-  if (!canGoPreviousMonth.value) {
-    return;
-  }
-
-  visibleMonthDate.value = new Date(visibleMonthDate.value.getFullYear(), visibleMonthDate.value.getMonth() - 1, 1, 12, 0, 0, 0);
-}
-
-function goToNextMonth() {
-  if (!canGoNextMonth.value) {
-    return;
-  }
-
-  visibleMonthDate.value = new Date(visibleMonthDate.value.getFullYear(), visibleMonthDate.value.getMonth() + 1, 1, 12, 0, 0, 0);
-}
-
-function selectCalendarDate(cell) {
-  if (!cell?.selectable) {
-    return;
-  }
-
-  selectedDateInput.value = cell.key;
+function selectAvailableDay(key) {
+  selectedDateInput.value = key;
 }
 </script>
 
@@ -598,7 +428,7 @@ function selectCalendarDate(cell) {
               </div>
 
               <div class="flex flex-col items-end gap-2 pt-2">
-                <Icon v-if="currentWeather?.icon" :icon="getWeatherIcon(currentWeather.icon)" class="weather-hero-icon" aria-hidden="true" />
+                <img v-if="currentWeather?.animatedIcon" :src="currentWeather.animatedIcon" alt="" class="weather-hero-icon" aria-hidden="true" />
                 <p class="condition-pill">
                   {{ weatherConditionLabel }}
                 </p>
@@ -640,17 +470,16 @@ function selectCalendarDate(cell) {
                   stroke-width="4"
                 />
               </svg>
-              <div class="flex">
-                <span class="font-display text-[6.5rem] leading-none text-white drop-shadow-title">
-                  {{ formatSeaTemperature(currentSeaTemperature) }}
-                </span>
-                <span class="mt-4 font-display text-4xl text-white drop-shadow-title">&deg;{{ temperatureUnitLabel }}</span>
-              </div>
-            </div>
-            <div class="glass-card hero-water-card flex items-end gap-3">
-              <div class="flex-1">
-                <p class="text-xs uppercase tracking-[0.24em] text-stone-600">{{ t("displayedTide") }}</p>
-                <p class="mt-1 font-display text-2xl text-stone-800">{{ formatTideHeight(currentTideCurrent?.height) }}</p>
+              <div class="flex flex-col items-end">
+                <div class="flex">
+                  <span class="font-display text-[6.5rem] leading-none text-white drop-shadow-title">
+                    {{ formatSeaTemperature(currentSeaTemperature) }}
+                  </span>
+                  <span class="mt-4 font-display text-4xl text-white drop-shadow-title">&deg;{{ temperatureUnitLabel }}</span>
+                </div>
+                <p class="mt-2 pl-1 font-display text-2xl text-white/92 drop-shadow-title">
+                  {{ formatTideHeight(currentTideCurrent?.height) }}
+                </p>
               </div>
             </div>
 
@@ -674,75 +503,18 @@ function selectCalendarDate(cell) {
               <p class="mt-1 text-sm text-stone-500">{{ t("availableWindow") }}</p>
             </div>
 
-            <div class="calendar-card">
-              <div class="calendar-header">
+            <div class="overflow-x-auto pb-1">
+              <div class="inline-flex min-w-max gap-2">
                 <button
+                  v-for="day in selectedDateOptions"
+                  :key="day.key"
                   type="button"
-                  class="calendar-nav-button"
-                  :disabled="!canGoPreviousMonth"
-                  :aria-label="t('previousMonth')"
-                  :title="t('previousMonth')"
-                  @click="goToPreviousMonth"
+                  class="day-pill"
+                  :class="{ 'day-pill-active': day.key === selectedDateInput }"
+                  :title="day.fullLabel"
+                  @click="selectAvailableDay(day.key)"
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    class="calendar-nav-icon"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="m15 18-6-6 6-6" />
-                  </svg>
-                </button>
-
-                <p class="calendar-month-label">{{ calendarMonthLabel }}</p>
-
-                <button
-                  type="button"
-                  class="calendar-nav-button"
-                  :disabled="!canGoNextMonth"
-                  :aria-label="t('nextMonth')"
-                  :title="t('nextMonth')"
-                  @click="goToNextMonth"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    class="calendar-nav-icon"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
-                  >
-                    <path d="m9 6 6 6-6 6" />
-                  </svg>
-                </button>
-              </div>
-
-              <div class="calendar-weekdays">
-                <span v-for="label in weekdayLabels" :key="label" class="calendar-weekday">{{ label }}</span>
-              </div>
-
-              <div class="calendar-grid">
-                <button
-                  v-for="cell in calendarCells"
-                  :key="cell.key"
-                  type="button"
-                  class="calendar-day"
-                  :class="{
-                    'calendar-day-empty': cell.empty,
-                    'calendar-day-selected': cell.selected,
-                    'calendar-day-today': cell.today && !cell.selected,
-                    'calendar-day-disabled': !cell.empty && !cell.selectable,
-                  }"
-                  :disabled="cell.empty || !cell.selectable"
-                  @click="selectCalendarDate(cell)"
-                >
-                  <span v-if="!cell.empty">{{ cell.dayNumber }}</span>
+                  {{ day.label }}
                 </button>
               </div>
             </div>
@@ -822,7 +594,7 @@ function selectCalendarDate(cell) {
                   <p class="eyebrow">{{ t("dayWeather") }}</p>
                   <h3 class="mt-1 font-display text-2xl text-stone-800">{{ selectedLabel }}</h3>
                 </div>
-                <Icon v-if="selectedWeather?.icon" :icon="getWeatherIcon(selectedWeather.icon)" class="weather-panel-icon" aria-hidden="true" />
+                <img v-if="selectedWeather?.animatedIcon" :src="selectedWeather.animatedIcon" alt="" class="weather-panel-icon" aria-hidden="true" />
               </div>
 
               <div class="mt-4 flex items-end justify-between gap-3">
@@ -888,7 +660,7 @@ function selectCalendarDate(cell) {
                       :class="{ 'hourly-card-current': slot.isCurrent }"
                     >
                       <p class="hourly-time">{{ slot.label }}</p>
-                      <Icon v-if="slot.icon" :icon="getWeatherIcon(slot.icon)" class="hourly-weather-icon" aria-hidden="true" />
+                      <img v-if="slot.animatedIcon" :src="slot.animatedIcon" alt="" class="hourly-weather-icon" aria-hidden="true" />
                       <p class="hourly-temp">{{ formatTemperature(slot.temp) }}&deg;</p>
                       <p class="hourly-meta">{{ formatPercent(slot.rainProbability) }}</p>
                     </article>
@@ -938,7 +710,10 @@ function selectCalendarDate(cell) {
             <div class="mt-5 grid gap-3 md:grid-cols-2">
               <article v-for="event in eventsForDay" :key="`${event.title}-${event.start}`" class="event-card">
                 <div class="flex items-start justify-between gap-3">
-                  <span class="event-badge">{{ t("cityBadge") }}</span>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span class="event-badge">{{ t("cityBadge") }}</span>
+                    <span v-if="event.tag" class="event-tag">{{ event.tag }}</span>
+                  </div>
                   <p class="text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
                     {{ helpers.toHourMinute(new Date(event.start)) }} - {{ helpers.toHourMinute(new Date(event.end)) }}
                   </p>
@@ -973,9 +748,10 @@ function selectCalendarDate(cell) {
             {{ seaTemperatureError }}
           </p>
 
-          <p class="mt-4 text-xs leading-5 text-stone-500">
-            {{ t("tideAttribution") }}
-          </p>
+          <div class="mt-4 space-y-1 text-xs leading-5 text-stone-500">
+            <p>{{ t("dataAttribution") }}</p>
+            <p>{{ t("madeBy") }}</p>
+          </div>
         </article>
       </section>
     </main>

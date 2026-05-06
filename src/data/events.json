@@ -4,6 +4,10 @@
       "fr": "Marche du Clair de Lune",
       "en": "Moonlight Walk"
     },
+    "tag": {
+      "fr": "Balade",
+      "en": "Walk"
+    },
     "start": "2026-05-08T20:30:00+02:00",
     "end": "2026-05-08T22:15:00+02:00",
     "description": {
@@ -19,6 +23,10 @@
     "title": {
       "fr": "Marche des Createurs",
       "en": "Makers Market"
+    },
+    "tag": {
+      "fr": "Marche",
+      "en": "Market"
     },
     "start": "2026-05-09T10:00:00+02:00",
     "end": "2026-05-09T18:00:00+02:00",
@@ -36,6 +44,10 @@
       "fr": "Atelier Cerf-Volant en Famille",
       "en": "Family Kite Workshop"
     },
+    "tag": {
+      "fr": "Famille",
+      "en": "Family"
+    },
     "start": "2026-05-10T14:30:00+02:00",
     "end": "2026-05-10T16:00:00+02:00",
     "description": {
@@ -51,6 +63,10 @@
     "title": {
       "fr": "Concert Sunset sur la Digue",
       "en": "Sunset Concert on the Seawall"
+    },
+    "tag": {
+      "fr": "Concert",
+      "en": "Concert"
     },
     "start": "2026-05-15T19:00:00+02:00",
     "end": "2026-05-15T21:30:00+02:00",
@@ -68,6 +84,10 @@
       "fr": "Marche Gourmand du Samedi",
       "en": "Saturday Food Market"
     },
+    "tag": {
+      "fr": "Gourmand",
+      "en": "Food"
+    },
     "start": "2026-05-16T08:30:00+02:00",
     "end": "2026-05-16T13:00:00+02:00",
     "description": {
@@ -83,6 +103,10 @@
     "title": {
       "fr": "Projection Plein Air sur le Port",
       "en": "Open-Air Screening at the Harbor"
+    },
+    "tag": {
+      "fr": "Cinema",
+      "en": "Cinema"
     },
     "start": "2026-05-22T21:45:00+02:00",
     "end": "2026-05-22T23:30:00+02:00",
@@ -100,6 +124,10 @@
       "fr": "Initiation Paddle Maree Montante",
       "en": "Rising Tide Paddle Intro"
     },
+    "tag": {
+      "fr": "Sport",
+      "en": "Sport"
+    },
     "start": "2026-05-24T09:15:00+02:00",
     "end": "2026-05-24T11:00:00+02:00",
     "description": {
@@ -115,6 +143,10 @@
     "title": {
       "fr": "Lecture au Jardin Anglais",
       "en": "Reading Time in the English Garden"
+    },
+    "tag": {
+      "fr": "Lecture",
+      "en": "Reading"
     },
     "start": "2026-05-31T16:00:00+02:00",
     "end": "2026-05-31T17:15:00+02:00",
