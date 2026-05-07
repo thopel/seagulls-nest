@@ -24,6 +24,13 @@
   color: #4e463c;
   font-family: var(--font-body);
   background: #eef7ff;
+  --app-screen-min-height: 100vh;
+}
+
+@supports (height: 100svh) {
+  :root {
+    --app-screen-min-height: 100svh;
+  }
 }
 
 html {
@@ -33,7 +40,7 @@ html {
 body {
   margin: 0;
   min-width: 320px;
-  min-height: 100dvh;
+  min-height: var(--app-screen-min-height);
   font-family: var(--font-body);
   background: #eef7ff;
 }
@@ -43,7 +50,11 @@ button {
 }
 
 #app {
-  min-height: 100dvh;
+  min-height: var(--app-screen-min-height);
+}
+
+.stable-screen-min-height {
+  min-height: var(--app-screen-min-height);
 }
 
 .bg-page {
@@ -51,7 +62,7 @@ button {
 }
 
 .phone-shell {
-  min-height: 100dvh;
+  min-height: var(--app-screen-min-height);
   background: transparent;
   backdrop-filter: blur(2px);
 }

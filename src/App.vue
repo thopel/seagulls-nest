@@ -436,7 +436,7 @@ function dismissMotionPrompt() {
 </script>
 
 <template>
-  <div class="min-h-[100dvh] bg-page text-stone-800" :style="pageStyle">
+  <div class="stable-screen-min-height bg-page text-stone-800" :style="pageStyle">
     <div
       v-if="showMotionPrompt"
       class="fixed inset-0 z-[80] flex items-end bg-[#102038]/40 p-4 backdrop-blur-sm lg:hidden"
@@ -478,7 +478,7 @@ function dismissMotionPrompt() {
       <section class="phone-shell relative isolate shadow-shell">
         <WaterScene :sky-color="skyPalette.phone" :water-ratio="currentWaterRatio" :tilt-x="tiltX" :tilt-y="tiltY" :energy="energy" />
 
-        <div class="relative z-10 flex min-h-[100dvh] flex-col justify-between p-5 pb-14 sm:p-6">
+        <div class="stable-screen-min-height relative z-10 flex flex-col justify-between p-5 pb-14 sm:p-6">
           <div class="space-y-4">
             <div class="flex items-start justify-between gap-3">
               <div>
