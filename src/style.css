@@ -43,10 +43,21 @@ body {
   min-height: var(--app-screen-min-height);
   font-family: var(--font-body);
   background: #eef7ff;
+  scrollbar-width: none;
 }
 
 button {
   font: inherit;
+}
+
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 #app {
@@ -59,6 +70,10 @@ button {
 
 .bg-page {
   transition: background-color 300ms ease;
+}
+
+.app-shell {
+  width: 100%;
 }
 
 .phone-shell {
@@ -322,7 +337,8 @@ button {
   max-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  padding-bottom: 0.2rem;
+  padding-bottom: 0;
+  border-radius: 1.45rem;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
 }
@@ -682,6 +698,7 @@ button {
   padding: 0.76rem 1rem;
   font-weight: 700;
   white-space: nowrap;
+  text-align: center;
   box-shadow: 0 8px 20px rgba(126, 101, 47, 0.08);
   transition:
     transform 180ms ease,
@@ -690,69 +707,82 @@ button {
     box-shadow 180ms ease;
 }
 
+.day-pill-track {
+  display: inline-flex;
+  gap: 0.5rem;
+  min-width: 100%;
+  width: max-content;
+}
+
 .day-pill-active {
   background: #4baeb1;
   color: white;
   transform: translateY(-1px);
 }
 
-.desktop-shell {
-  position: relative;
-  width: 100dvw;
-  height: 100dvh;
-  overflow: hidden;
-  align-items: center;
-  justify-content: center;
-}
-
-.desktop-overlay {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  width: min(72rem, calc(100dvw - 6rem));
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1.5rem;
-  text-align: center;
-}
-
-.desktop-nest {
-  width: min(28rem, 48vw);
-  max-width: 100%;
-  height: auto;
-  object-fit: contain;
-  filter: drop-shadow(0 1rem 2.4rem rgba(25, 61, 85, 0.2));
-}
-
-.desktop-message {
-  max-width: 36rem;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 2rem;
-  background: rgba(255, 252, 243, 0.78);
-  padding: 1.5rem 1.8rem;
-  box-shadow: 0 18px 48px rgba(126, 101, 47, 0.12);
-  backdrop-filter: blur(18px);
-}
-
-.desktop-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2.5rem, 2vw, 2rem);
-  color: #534736;
-}
-
-.desktop-body {
-  margin: 0.8rem 0 0;
-  font-size: 1rem;
-  line-height: 1.7;
-  color: #5c5447;
-}
-
 @media (min-width: 768px) {
   .date-selector-shell {
-    grid-template-columns: minmax(0, 1fr) minmax(18rem, 22rem);
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
+  }
+}
+
+@media (min-width: 900px) {
+  .app-shell {
+    display: grid;
+    grid-template-columns: minmax(16rem, 25vw) minmax(0, 1fr);
+    gap: 1rem;
+    max-width: none;
+    height: var(--app-screen-min-height);
+    padding: 1rem;
+    align-items: stretch;
+    overflow: hidden;
+  }
+
+  .app-hero-shell {
+    min-height: 0;
+    height: 100%;
+    border-radius: 2rem;
+    overflow: hidden;
+  }
+
+  .app-hero-shell .stable-screen-min-height {
+    min-height: 100%;
+  }
+
+  .app-panels {
+    margin-top: 0;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .app-panels .paper-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    border-radius: 2rem;
+    box-shadow: none;
+    overflow: hidden;
+  }
+
+  .panel-scroll {
+    min-height: 0;
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1279px) and (orientation: landscape) {
+  .app-shell {
+    grid-template-columns: minmax(400px, 1fr) minmax(0, 2fr);
+  }
+
+  .phone-floating-stack {
+    transform: translateY(0);
   }
 }
 

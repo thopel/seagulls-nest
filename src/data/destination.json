@@ -71,6 +71,6 @@
     "lang": "fr",
     "startUrl": "/",
     "display": "standalone",
-    "orientation": "portrait"
+    "orientation": "any"
   }
 }

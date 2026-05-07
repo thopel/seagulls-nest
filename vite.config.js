@@ -7,12 +7,18 @@ import { VitePWA } from 'vite-plugin-pwa'
 const destinationConfig = JSON.parse(
   readFileSync(new URL('./src/data/destination.json', import.meta.url), 'utf8')
 )
+const packageConfig = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8')
+)
 
 const appConfig = destinationConfig.app
 const devConfig = destinationConfig.development
 const pwaConfig = destinationConfig.pwa
 
 export default {
+  define: {
+    __APP_VERSION__: JSON.stringify(packageConfig.version)
+  },
   server: {
     host: devConfig.host,
     port: devConfig.port,

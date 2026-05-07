@@ -6,7 +6,7 @@ import { useLocale } from "./composables/useLocale";
 import { useMotionGlass } from "./composables/useMotionGlass";
 
 const { locale, localeOptions, t } = useLocale();
-const DESKTOP_SLEEPING_NEST_SRC = "/assets/seegulls-nest-asleep.png";
+const APP_VERSION = __APP_VERSION__;
 
 const TEMPERATURE_UNIT_KEY = "coastal-companion-temperature-unit";
 const DISTANCE_UNIT_KEY = "coastal-companion-distance-unit";
@@ -439,7 +439,7 @@ function dismissMotionPrompt() {
   <div class="stable-screen-min-height bg-page text-stone-800" :style="pageStyle">
     <div
       v-if="showMotionPrompt"
-      class="fixed inset-0 z-[80] flex items-end bg-[#102038]/40 p-4 backdrop-blur-sm lg:hidden"
+      class="fixed inset-0 z-[80] flex items-end bg-[#102038]/40 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       :aria-labelledby="'motion-permission-title'"
@@ -474,8 +474,8 @@ function dismissMotionPrompt() {
       </div>
     </div>
 
-    <main class="mx-auto flex max-w-6xl flex-col gap-4 lg:hidden">
-      <section class="phone-shell relative isolate shadow-shell">
+    <main class="app-shell mx-auto flex w-full flex-col gap-4">
+      <section class="app-hero-shell phone-shell relative isolate shadow-shell">
         <WaterScene :sky-color="skyPalette.phone" :water-ratio="currentWaterRatio" :tilt-x="tiltX" :tilt-y="tiltY" :energy="energy" />
 
         <div class="stable-screen-min-height relative z-10 flex flex-col justify-between p-5 pb-14 sm:p-6">
@@ -628,273 +628,265 @@ function dismissMotionPrompt() {
         </div>
       </section>
 
-      <section class="panel-stack">
+      <section class="app-panels panel-stack">
         <article class="paper-panel">
-          <div class="date-selector-shell panel-block">
-            <div class="min-w-0">
-              <p class="mt-2 font-display text-2xl text-stone-800">{{ selectedLabel }}</p>
-              <p class="mt-1 text-sm text-stone-500">{{ t("availableWindow") }}</p>
-            </div>
-
-            <div class="edge-scroll pb-1">
-              <div class="inline-flex min-w-max gap-2">
-                <button
-                  v-for="day in selectedDateOptions"
-                  :key="day.key"
-                  type="button"
-                  class="day-pill"
-                  :class="{ 'day-pill-active': day.key === selectedDateInput }"
-                  :title="day.fullLabel"
-                  @click="selectAvailableDay(day.key)"
-                >
-                  {{ day.label }}
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel-block my-5 grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-            <div class="soft-card">
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <p class="eyebrow">{{ t("dayWeather") }}</p>
-                  <h3 class="mt-1 font-display text-2xl text-stone-800">{{ selectedLabel }}</h3>
-                </div>
-                <img v-if="selectedWeather?.animatedIcon" :src="selectedWeather.animatedIcon" alt="" class="weather-panel-icon" aria-hidden="true" />
+          <div class="panel-scroll">
+            <div class="date-selector-shell panel-block">
+              <div class="pe-4">
+                <p class="mt-2 font-display text-2xl text-stone-800">{{ selectedLabel }}</p>
+                <p class="mt-1 text-sm text-stone-500">{{ t("availableWindow") }}</p>
               </div>
 
-              <div class="mt-4 flex items-end justify-between gap-3">
-                <div>
-                  <div class="flex items-start gap-2">
-                    <span class="font-display text-5xl leading-none text-stone-800">
-                      {{ formatTemperature(selectedWeather?.temp) }}
-                    </span>
-                    <span class="mt-1 font-display text-2xl text-stone-700">&deg;{{ temperatureUnitLabel }}</span>
-                  </div>
-                  <p class="mt-2 rounded-full bg-[#fbf5df] px-3 py-2 text-sm font-semibold text-stone-700">
-                    {{ selectedWeatherConditionLabel }}
-                  </p>
-                </div>
-
-                <div class="rounded-[1.3rem] bg-white/75 px-4 py-3 text-right">
-                  <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("rainfall") }}</p>
-                  <p class="mt-1 font-display text-2xl text-stone-800">{{ formatPrecipitation(selectedWeather?.precipitationMm) }}</p>
-                </div>
-              </div>
-
-              <div class="mt-4 grid grid-cols-2 gap-2">
-                <article v-for="item in selectedWeatherStats" :key="item.key" class="glass-tile day-detail-tile">
-                  <p class="text-lg font-display text-stone-800">{{ item.value }}</p>
-                  <p class="mt-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-stone-600">
-                    {{ t(item.key) }}
-                  </p>
-                </article>
-              </div>
-
-              <div v-if="selectedWeather?.sunrise || selectedWeather?.sunset" class="mt-4 grid grid-cols-2 gap-2 rounded-[1.4rem] bg-white/70 p-3">
-                <div>
-                  <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("sunrise") }}</p>
-                  <p class="mt-1 font-display text-xl text-stone-800">
-                    {{ selectedWeather?.sunrise ? helpers.toHourMinute(new Date(selectedWeather.sunrise)) : "--" }}
-                  </p>
-                </div>
-                <div class="text-right">
-                  <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("sunset") }}</p>
-                  <p class="mt-1 font-display text-xl text-stone-800">
-                    {{ selectedWeather?.sunset ? helpers.toHourMinute(new Date(selectedWeather.sunset)) : "--" }}
-                  </p>
-                </div>
-              </div>
-
-              <div v-if="selectedWeatherTimeline.length" class="mt-4">
-                <div class="flex items-baseline justify-start gap-3">
-                  <p class="eyebrow">{{ t("hourlyDetails") }}</p>
-                </div>
-
-                <div class="hourly-scroll-shell edge-scroll-card mt-3">
-                  <div class="hourly-strip">
-                    <article
-                      v-for="slot in selectedWeatherTimeline"
-                      :key="`${slot.time}-${slot.label}`"
-                      class="hourly-card"
-                      :class="{ 'hourly-card-current': slot.isCurrent }"
-                    >
-                      <p class="hourly-time">{{ slot.label }}</p>
-                      <img v-if="slot.animatedIcon" :src="slot.animatedIcon" alt="" class="hourly-weather-icon" aria-hidden="true" />
-                      <p class="hourly-temp">{{ formatTemperature(slot.temp) }}&deg;</p>
-                      <p class="hourly-meta">{{ formatPercent(slot.rainProbability) }}</p>
-                    </article>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="panel-block">
-            <div class="soft-card">
-              <div class="flex items-center justify-between gap-3">
-                <div>
-                  <p class="eyebrow">{{ t("tideCurve") }}</p>
-                </div>
-                <button
-                  type="button"
-                  class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#fbf5df] text-stone-600 transition disabled:cursor-default disabled:opacity-55"
-                  :disabled="isCurrentTideView"
-                  :aria-label="t('chartNow')"
-                  :title="t('chartNow')"
-                  @click="resetTideChartSelection"
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    class="h-4.5 w-4.5"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    aria-hidden="true"
+              <div class="edge-scroll min-w-0 pb-1">
+                <div class="day-pill-track">
+                  <button
+                    v-for="day in selectedDateOptions"
+                    :key="day.key"
+                    type="button"
+                    class="day-pill"
+                    :class="{ 'day-pill-active': day.key === selectedDateInput }"
+                    :title="day.fullLabel"
+                    @click="selectAvailableDay(day.key)"
                   >
-                    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                    <path d="M21 3v6h-6" />
-                  </svg>
-                  <span class="sr-only">{{ t("chartNow") }}</span>
-                </button>
-              </div>
-
-              <div class="tide-chart-wrap mt-4 rounded-[1.7rem] bg-[#fff9ea] p-4 shadow-inner-soft">
-                <div
-                  ref="tideChartRef"
-                  class="tide-chart-canvas"
-                  @click="onTideChartClick"
-                  @pointerdown="startTideChartDrag"
-                  @pointermove="dragTideChart"
-                  @pointerup="stopTideChartDrag"
-                  @pointercancel="stopTideChartDrag"
-                >
-                  <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="h-44 w-full overflow-visible" aria-hidden="true">
-                    <defs>
-                      <linearGradient id="tideStroke" x1="0%" x2="100%" y1="0%" y2="0%">
-                        <stop offset="0%" stop-color="#62c3be" />
-                        <stop offset="100%" stop-color="#3d84a8" />
-                      </linearGradient>
-                    </defs>
-                    <polyline fill="none" stroke="url(#tideStroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" :points="tideGraph" />
-                    <template v-if="activeTidePoint">
-                      <line :x1="activeTidePoint.x" y1="0" :x2="activeTidePoint.x" y2="100" stroke="#e58f64" stroke-dasharray="2 3" stroke-width="1.3" />
-                    </template>
-                  </svg>
-
-                  <div v-if="activeTidePoint" class="tide-chart-dot" :style="{ left: `${activeTidePoint.x}%`, top: `${activeTidePoint.y}%` }"></div>
+                    {{ day.label }}
+                  </button>
                 </div>
-
-                <div class="mt-3 flex justify-between text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                  <span>00:00</span>
-                  <span>12:00</span>
-                  <span>23:59</span>
-                </div>
-
-                <div v-if="activeTidePoint" class="mt-3 rounded-full bg-[#eb9b73] px-4 py-2 text-sm font-semibold text-white">
-                  {{ t("chartSelection") }}:
-                  {{ helpers.toHourMinute(new Date(activeTidePoint.time)) }}
-                  -
-                  {{ formatTideHeight(activeTidePoint.height) }}
-                </div>
-                <p v-else class="mt-3 text-sm text-stone-500">{{ t("tapChart") }}</p>
               </div>
             </div>
-          </div>
 
-          <div class="panel-block mt-4">
-            <div class="soft-card">
-              <p class="eyebrow">{{ t("highlights") }}</p>
-              <div class="mt-4 grid gap-3 md:grid-cols-2">
-                <article v-for="turn in tideEvents" :key="turn.time" class="turn-card">
+            <div class="panel-block my-5">
+              <div class="soft-card">
+                <div class="flex items-start justify-between gap-3">
                   <div>
-                    <p class="font-display text-xl text-stone-800">{{ formatTideHeight(turn.height) }}</p>
-                    <p class="text-xs uppercase tracking-[0.18em] text-stone-500">
-                      {{ turn.kind === "high" ? t("highTideFull") : t("lowTideFull") }}
+                    <p class="eyebrow">{{ t("dayWeather") }}</p>
+                    <h3 class="mt-1 font-display text-2xl text-stone-800">{{ selectedLabel }}</h3>
+                  </div>
+                  <img v-if="selectedWeather?.animatedIcon" :src="selectedWeather.animatedIcon" alt="" class="weather-panel-icon" aria-hidden="true" />
+                </div>
+
+                <div class="mt-4 flex items-end justify-between gap-3">
+                  <div>
+                    <div class="flex items-start gap-2">
+                      <span class="font-display text-5xl leading-none text-stone-800">
+                        {{ formatTemperature(selectedWeather?.temp) }}
+                      </span>
+                      <span class="mt-1 font-display text-2xl text-stone-700">&deg;{{ temperatureUnitLabel }}</span>
+                    </div>
+                    <p class="mt-2 rounded-full bg-[#fbf5df] px-3 py-2 text-sm font-semibold text-stone-700">
+                      {{ selectedWeatherConditionLabel }}
                     </p>
                   </div>
-                  <p class="rounded-full bg-white/80 px-3 py-1 text-sm font-semibold text-stone-700">
-                    {{ helpers.toHourMinute(new Date(turn.time)) }}
-                  </p>
-                </article>
-              </div>
 
-              <p v-if="!tideEvents.length && !tideLoading && !tideError" class="mt-4 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
-                {{ t("noTideData") }}
-              </p>
-              <p v-if="tideError" class="mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
-                {{ tideError }}
-              </p>
-            </div>
-          </div>
-
-          <div class="panel-block mt-4">
-            <div class="soft-card">
-              <div class="flex items-start justify-between gap-4">
-                <div>
-                  <p class="eyebrow">{{ t("usefulInfo") }}</p>
+                  <div class="rounded-[1.3rem] bg-white/75 px-4 py-3 text-right">
+                    <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("rainfall") }}</p>
+                    <p class="mt-1 font-display text-2xl text-stone-800">{{ formatPrecipitation(selectedWeather?.precipitationMm) }}</p>
+                  </div>
                 </div>
-              </div>
 
-              <div class="mt-5 grid gap-3 md:grid-cols-2">
-                <a v-for="link in usefulLinks" :key="link.id" :href="link.url" class="event-card block no-underline" target="_blank" rel="noreferrer">
-                  <div v-if="link.tag" class="flex items-start justify-between gap-3">
-                    <div class="flex flex-wrap items-center gap-2">
-                      <span class="event-tag">{{ link.tag }}</span>
+                <div class="mt-4 grid grid-cols-2 gap-2">
+                  <article v-for="item in selectedWeatherStats" :key="item.key" class="glass-tile day-detail-tile">
+                    <p class="text-lg font-display text-stone-800">{{ item.value }}</p>
+                    <p class="mt-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-stone-600">
+                      {{ t(item.key) }}
+                    </p>
+                  </article>
+                </div>
+
+                <div v-if="selectedWeather?.sunrise || selectedWeather?.sunset" class="mt-4 grid grid-cols-2 gap-2 rounded-[1.4rem] bg-white/70 p-3">
+                  <div>
+                    <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("sunrise") }}</p>
+                    <p class="mt-1 font-display text-xl text-stone-800">
+                      {{ selectedWeather?.sunrise ? helpers.toHourMinute(new Date(selectedWeather.sunrise)) : "--" }}
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("sunset") }}</p>
+                    <p class="mt-1 font-display text-xl text-stone-800">
+                      {{ selectedWeather?.sunset ? helpers.toHourMinute(new Date(selectedWeather.sunset)) : "--" }}
+                    </p>
+                  </div>
+                </div>
+
+                <div v-if="selectedWeatherTimeline.length" class="mt-4">
+                  <div class="flex items-baseline justify-start gap-3">
+                    <p class="eyebrow">{{ t("hourlyDetails") }}</p>
+                  </div>
+
+                  <div class="hourly-scroll-shell edge-scroll-card mt-3">
+                    <div class="hourly-strip">
+                      <article
+                        v-for="slot in selectedWeatherTimeline"
+                        :key="`${slot.time}-${slot.label}`"
+                        class="hourly-card"
+                        :class="{ 'hourly-card-current': slot.isCurrent }"
+                      >
+                        <p class="hourly-time">{{ slot.label }}</p>
+                        <img v-if="slot.animatedIcon" :src="slot.animatedIcon" alt="" class="hourly-weather-icon" aria-hidden="true" />
+                        <p class="hourly-temp">{{ formatTemperature(slot.temp) }}&deg;</p>
+                        <p class="hourly-meta">{{ formatPercent(slot.rainProbability) }}</p>
+                      </article>
                     </div>
                   </div>
-                  <h3 class="font-display text-2xl text-stone-800">{{ link.title }}</h3>
-                  <p v-if="link.description" class="mt-3 text-sm leading-6 text-stone-600">{{ link.description }}</p>
-                  <div class="mt-4 flex items-center justify-between gap-3">
-                    <p class="text-xs uppercase tracking-[0.16em] text-stone-500">{{ link.sourceLabel }}</p>
-                    <p class="rounded-full bg-[#eb9b73] px-3 py-2 text-sm font-semibold text-white">{{ t("openLink") }}</p>
-                  </div>
-                </a>
-
-                <article v-if="!usefulLinks.length" class="event-card md:col-span-2">
-                  <h3 class="font-display text-2xl text-stone-800">{{ t("usefulLinksEmptyTitle") }}</h3>
-                  <p class="mt-3 text-sm leading-6 text-stone-600">{{ t("usefulLinksEmptyBody") }}</p>
-                </article>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="panel-block mt-4">
-            <div class="soft-card story-card">
-              <p class="eyebrow">{{ t("storyEyebrow") }}</p>
-              <h2 class="panel-title">{{ t("storyTitle") }}</h2>
-              <p class="mt-3 text-sm leading-7 text-stone-600">
-                {{ t("storyBody") }}
-              </p>
+            <div class="panel-block">
+              <div class="soft-card">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="eyebrow">{{ t("tideCurve") }}</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#fbf5df] text-stone-600 transition disabled:cursor-default disabled:opacity-55"
+                    :disabled="isCurrentTideView"
+                    :aria-label="t('chartNow')"
+                    :title="t('chartNow')"
+                    @click="resetTideChartSelection"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      class="h-4.5 w-4.5"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2.2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                      <path d="M21 3v6h-6" />
+                    </svg>
+                    <span class="sr-only">{{ t("chartNow") }}</span>
+                  </button>
+                </div>
+
+                <div class="tide-chart-wrap mt-4 rounded-[1.7rem] bg-[#fff9ea] p-4 shadow-inner-soft">
+                  <div
+                    ref="tideChartRef"
+                    class="tide-chart-canvas"
+                    @click="onTideChartClick"
+                    @pointerdown="startTideChartDrag"
+                    @pointermove="dragTideChart"
+                    @pointerup="stopTideChartDrag"
+                    @pointercancel="stopTideChartDrag"
+                  >
+                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="h-44 w-full overflow-visible" aria-hidden="true">
+                      <defs>
+                        <linearGradient id="tideStroke" x1="0%" x2="100%" y1="0%" y2="0%">
+                          <stop offset="0%" stop-color="#62c3be" />
+                          <stop offset="100%" stop-color="#3d84a8" />
+                        </linearGradient>
+                      </defs>
+                      <polyline fill="none" stroke="url(#tideStroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" :points="tideGraph" />
+                      <template v-if="activeTidePoint">
+                        <line :x1="activeTidePoint.x" y1="0" :x2="activeTidePoint.x" y2="100" stroke="#e58f64" stroke-dasharray="2 3" stroke-width="1.3" />
+                      </template>
+                    </svg>
+
+                    <div v-if="activeTidePoint" class="tide-chart-dot" :style="{ left: `${activeTidePoint.x}%`, top: `${activeTidePoint.y}%` }"></div>
+                  </div>
+
+                  <div class="mt-3 flex justify-between text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                    <span>00:00</span>
+                    <span>12:00</span>
+                    <span>23:59</span>
+                  </div>
+
+                  <div v-if="activeTidePoint" class="mt-3 rounded-full bg-[#eb9b73] px-4 py-2 text-sm font-semibold text-white">
+                    {{ t("chartSelection") }}:
+                    {{ helpers.toHourMinute(new Date(activeTidePoint.time)) }}
+                    -
+                    {{ formatTideHeight(activeTidePoint.height) }}
+                  </div>
+                  <p v-else class="mt-3 text-sm text-stone-500">{{ t("tapChart") }}</p>
+                </div>
+              </div>
             </div>
-          </div>
 
-          <p v-if="weatherError" class="panel-block mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
-            {{ weatherError }}
-          </p>
-          <p v-if="seaTemperatureError" class="panel-block mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
-            {{ seaTemperatureError }}
-          </p>
+            <div class="panel-block mt-4">
+              <div class="soft-card">
+                <p class="eyebrow">{{ t("highlights") }}</p>
+                <div class="mt-4 grid gap-3 md:grid-cols-2">
+                  <article v-for="turn in tideEvents" :key="turn.time" class="turn-card">
+                    <div>
+                      <p class="font-display text-xl text-stone-800">{{ formatTideHeight(turn.height) }}</p>
+                      <p class="text-xs uppercase tracking-[0.18em] text-stone-500">
+                        {{ turn.kind === "high" ? t("highTideFull") : t("lowTideFull") }}
+                      </p>
+                    </div>
+                    <p class="rounded-full bg-white/80 px-3 py-1 text-sm font-semibold text-stone-700">
+                      {{ helpers.toHourMinute(new Date(turn.time)) }}
+                    </p>
+                  </article>
+                </div>
 
-          <div class="panel-block mt-4 space-y-1 text-xs leading-5 text-stone-500">
-            <p>{{ t("dataAttribution") }}</p>
-            <p>{{ t("madeBy") }}</p>
+                <p v-if="!tideEvents.length && !tideLoading && !tideError" class="mt-4 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
+                  {{ t("noTideData") }}
+                </p>
+                <p v-if="tideError" class="mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
+                  {{ tideError }}
+                </p>
+              </div>
+            </div>
+
+            <div class="panel-block mt-4">
+              <div class="soft-card">
+                <div class="flex items-start justify-between gap-4">
+                  <div>
+                    <p class="eyebrow">{{ t("usefulInfo") }}</p>
+                  </div>
+                </div>
+
+                <div class="mt-5 grid gap-3 md:grid-cols-2">
+                  <a v-for="link in usefulLinks" :key="link.id" :href="link.url" class="event-card block no-underline" target="_blank" rel="noreferrer">
+                    <div v-if="link.tag" class="flex items-start justify-between gap-3">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="event-tag">{{ link.tag }}</span>
+                      </div>
+                    </div>
+                    <h3 class="font-display text-2xl text-stone-800">{{ link.title }}</h3>
+                    <p v-if="link.description" class="mt-3 text-sm leading-6 text-stone-600">{{ link.description }}</p>
+                    <div class="mt-4 flex items-center justify-between gap-3">
+                      <p class="text-xs uppercase tracking-[0.16em] text-stone-500">{{ link.sourceLabel }}</p>
+                      <p class="rounded-full bg-[#eb9b73] px-3 py-2 text-sm font-semibold text-white">{{ t("openLink") }}</p>
+                    </div>
+                  </a>
+
+                  <article v-if="!usefulLinks.length" class="event-card md:col-span-2">
+                    <h3 class="font-display text-2xl text-stone-800">{{ t("usefulLinksEmptyTitle") }}</h3>
+                    <p class="mt-3 text-sm leading-6 text-stone-600">{{ t("usefulLinksEmptyBody") }}</p>
+                  </article>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-block mt-4">
+              <div class="soft-card story-card">
+                <p class="eyebrow">{{ t("storyEyebrow") }}</p>
+                <h2 class="panel-title">{{ t("storyTitle") }}</h2>
+                <p class="mt-3 text-sm leading-7 text-stone-600">
+                  {{ t("storyBody") }}
+                </p>
+              </div>
+            </div>
+
+            <p v-if="weatherError" class="panel-block mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
+              {{ weatherError }}
+            </p>
+            <p v-if="seaTemperatureError" class="panel-block mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
+              {{ seaTemperatureError }}
+            </p>
+
+            <div class="panel-block mt-4 space-y-1 text-xs leading-5 text-stone-500">
+              <p>{{ t("dataAttribution") }}</p>
+              <p>{{ t("appVersionLabel") }} {{ APP_VERSION }}</p>
+              <p>{{ t("madeBy") }}</p>
+            </div>
           </div>
         </article>
       </section>
     </main>
-
-    <section class="desktop-shell hidden lg:flex">
-      <WaterScene :hide-nest="true" :sky-color="skyPalette.phone" :water-ratio="0.52" :tilt-x="0" :tilt-y="0" :energy="0" />
-      <div class="desktop-overlay">
-        <img :src="DESKTOP_SLEEPING_NEST_SRC" alt="" class="desktop-nest" aria-hidden="true" />
-        <div class="desktop-message">
-          <p class="desktop-title">{{ t("desktopOnlyTitle") }}</p>
-          <p class="desktop-body">{{ t("desktopOnlyBody") }}</p>
-        </div>
-      </div>
-    </section>
   </div>
 </template>
