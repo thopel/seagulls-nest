@@ -1,5 +1,7 @@
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import WaterScene from "./components/WaterScene.vue";
 import { useDestinationData } from "./composables/useDestinationData";
 import { useLocale } from "./composables/useLocale";
@@ -46,6 +48,13 @@ const isDraggingTideChart = ref(false);
 const showMotionPrompt = ref(false);
 const motionPromptDismissed = ref(false);
 const motionPromptPending = ref(false);
+const freeParkingGeoJson = ref(null);
+const freeParkingError = ref("");
+const freeParkingMapRef = ref(null);
+const freeParkingMapInstance = ref(null);
+const freeParkingZonesLayer = ref(null);
+const freeParkingDestinationLayer = ref(null);
+const freeParkingRenderer = L.canvas({ padding: 0.5 });
 const showMotionButton = computed(() => permissionState.value === "prompt" && motionPromptDismissed.value);
 const localeActiveIndex = computed(() =>
   Math.max(
@@ -55,6 +64,17 @@ const localeActiveIndex = computed(() =>
 );
 const temperatureUnitActiveIndex = computed(() => (temperatureUnit.value === "f" ? 1 : 0));
 const distanceUnitActiveIndex = computed(() => (distanceUnit.value === "imperial" ? 1 : 0));
+const freeParkingFocusCoordinates = {
+  lat: 48.634908346770374,
+  lon: -2.0528767519268625,
+};
+const freeParkingFocusZoom = 17;
+const freeParkingMarkerIcon = L.icon({
+  iconUrl: `${import.meta.env.BASE_URL}assets/seegulls-nest-awake.png`,
+  iconSize: [58, 42],
+  iconAnchor: [29, 34],
+  tooltipAnchor: [0, -23],
+});
 
 watch(
   permissionState,
@@ -90,6 +110,10 @@ watch(distanceUnit, (value) => {
 
 watch(selectedDateInput, () => {
   selectedTideIndex.value = null;
+});
+
+watch(locale, () => {
+  freeParkingDestinationLayer.value?.setTooltipContent(t("appName"));
 });
 
 function celsiusToFahrenheit(value) {
@@ -228,6 +252,7 @@ const stats = computed(() => [
 const selectedWeatherConditionLabel = computed(() =>
   weatherLoading.value ? t("gentleBreeze") : (selectedWeather.value?.condition ?? t("weatherUnavailable")),
 );
+const hasFreeParkingZones = computed(() => Array.isArray(freeParkingGeoJson.value?.features) && freeParkingGeoJson.value.features.length > 0);
 
 const selectedWeatherStats = computed(() => [
   {
@@ -433,6 +458,101 @@ function dismissMotionPrompt() {
   motionPromptDismissed.value = true;
   showMotionPrompt.value = false;
 }
+
+function initializeFreeParkingMap() {
+  if (!freeParkingMapRef.value || freeParkingMapInstance.value) {
+    return;
+  }
+
+  const map = L.map(freeParkingMapRef.value, {
+    zoomControl: true,
+    preferCanvas: true,
+    renderer: freeParkingRenderer,
+    scrollWheelZoom: true,
+  }).setView([freeParkingFocusCoordinates.lat, freeParkingFocusCoordinates.lon], freeParkingFocusZoom);
+
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
+
+  freeParkingMapInstance.value = map;
+}
+
+function recenterFreeParkingMap() {
+  freeParkingMapInstance.value?.setView([freeParkingFocusCoordinates.lat, freeParkingFocusCoordinates.lon], freeParkingFocusZoom, {
+    animate: true,
+  });
+}
+
+function updateFreeParkingMap() {
+  if (!freeParkingMapInstance.value || !freeParkingGeoJson.value) {
+    return;
+  }
+
+  freeParkingMapInstance.value.invalidateSize(false);
+  freeParkingZonesLayer.value?.remove();
+  freeParkingDestinationLayer.value?.remove();
+
+  freeParkingZonesLayer.value = L.geoJSON(freeParkingGeoJson.value, {
+    renderer: freeParkingRenderer,
+    style: {
+      color: "#a61e1e",
+      weight: 3,
+      fillColor: "#e34b4b",
+      fillOpacity: 0.72,
+    },
+  });
+
+  freeParkingZonesLayer.value.addTo(freeParkingMapInstance.value);
+
+  freeParkingMapInstance.value.setView([freeParkingFocusCoordinates.lat, freeParkingFocusCoordinates.lon], freeParkingFocusZoom, {
+    animate: false,
+  });
+
+  freeParkingDestinationLayer.value = L.marker([freeParkingFocusCoordinates.lat, freeParkingFocusCoordinates.lon], {
+    icon: freeParkingMarkerIcon,
+  })
+    .addTo(freeParkingMapInstance.value)
+    .bindTooltip(t("appName"), {
+      direction: "top",
+      offset: [0, -11],
+    });
+
+  requestAnimationFrame(() => {
+    freeParkingMapInstance.value?.invalidateSize(false);
+  });
+}
+
+async function loadFreeParkingGeoJson() {
+  freeParkingError.value = "";
+
+  try {
+    const response = await fetch(`${import.meta.env.BASE_URL}freepark.geojson`);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    freeParkingGeoJson.value = await response.json();
+    await nextTick();
+    initializeFreeParkingMap();
+    updateFreeParkingMap();
+  } catch (error) {
+    freeParkingGeoJson.value = null;
+    freeParkingError.value = `${t("freeParkingLoadError")} ${error.message}`;
+  }
+}
+
+onMounted(() => {
+  loadFreeParkingGeoJson();
+});
+
+onBeforeUnmount(() => {
+  freeParkingMapInstance.value?.remove();
+  freeParkingMapInstance.value = null;
+  freeParkingZonesLayer.value = null;
+  freeParkingDestinationLayer.value = null;
+});
 </script>
 
 <template>
@@ -827,6 +947,49 @@ function dismissMotionPrompt() {
                 </p>
                 <p v-if="tideError" class="mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
                   {{ tideError }}
+                </p>
+              </div>
+            </div>
+
+            <div class="panel-block mt-4">
+              <div class="soft-card">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="eyebrow">{{ t("freeParkingEyebrow") }}</p>
+                    <h2 class="panel-title">{{ t("freeParkingTitle") }}</h2>
+                  </div>
+                  <div class="parking-legend">
+                    <span class="parking-legend-swatch" aria-hidden="true"></span>
+                    <span>{{ t("freeParkingLegend") }}</span>
+                  </div>
+                </div>
+
+                <p class="mt-3 text-sm leading-6 text-stone-600">
+                  {{ t("freeParkingBody") }}
+                </p>
+
+                <div v-if="hasFreeParkingZones" class="parking-map-shell mt-4">
+                  <button
+                    type="button"
+                    class="parking-map-recenter"
+                    :aria-label="t('freeParkingRecenter')"
+                    @click="recenterFreeParkingMap"
+                  >
+                    {{ t("freeParkingRecenter") }}
+                  </button>
+                  <div ref="freeParkingMapRef" class="parking-map-canvas" :aria-label="t('freeParkingTitle')"></div>
+                </div>
+
+                <p v-else-if="freeParkingError" class="mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
+                  {{ freeParkingError }}
+                </p>
+
+                <p v-else class="mt-4 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
+                  {{ t("freeParkingEmpty") }}
+                </p>
+
+                <p class="parking-disclaimer mt-4">
+                  {{ t("freeParkingDisclaimer") }}
                 </p>
               </div>
             </div>
