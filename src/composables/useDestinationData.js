@@ -770,11 +770,32 @@ export function useDestinationData(locale, t) {
       isCurrent: true
     }
 
+    if (!slots.length) {
+      return [currentSlot]
+    }
+
+    const nearestSlotIndex = slots.reduce((closestIndex, entry, index) => {
+      if (closestIndex === -1) {
+        return index
+      }
+
+      return Math.abs(entry.time - currentSlot.time) < Math.abs(slots[closestIndex].time - currentSlot.time)
+        ? index
+        : closestIndex
+    }, -1)
+
     const hasNearbyForecast = slots.some(
       (entry) => Math.abs(entry.time - currentSlot.time) <= 90 * 60 * 1000
     )
 
-    return hasNearbyForecast ? slots : [currentSlot, ...slots]
+    if (!hasNearbyForecast) {
+      return [currentSlot, ...slots.map((entry) => ({ ...entry, isCurrent: false }))]
+    }
+
+    return slots.map((entry, index) => ({
+      ...entry,
+      isCurrent: index === nearestSlotIndex
+    }))
   })
 
   const getTideApiKey = () => import.meta.env.VITE_API_MAREE_KEY

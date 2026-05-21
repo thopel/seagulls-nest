@@ -341,6 +341,7 @@ button {
   border-radius: 1.45rem;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
 }
 
 .edge-scroll {
@@ -743,6 +744,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
+  width: fit-content;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.78);
   padding: 0.55rem 0.8rem;

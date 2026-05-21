@@ -2,6 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "@maptiler/sdk/dist/maptiler-sdk.css";
+import { Language, MapStyle, MaptilerLayer } from "@maptiler/leaflet-maptilersdk";
 import WaterScene from "./components/WaterScene.vue";
 import { useDestinationData } from "./composables/useDestinationData";
 import { useLocale } from "./composables/useLocale";
@@ -43,6 +45,7 @@ const {
 const { tiltX, tiltY, energy, permissionState, requestMotionAccess } = useMotionGlass();
 
 const tideChartRef = ref(null);
+const hourlyScrollRef = ref(null);
 const selectedTideIndex = ref(null);
 const isDraggingTideChart = ref(false);
 const showMotionPrompt = ref(false);
@@ -52,6 +55,7 @@ const freeParkingGeoJson = ref(null);
 const freeParkingError = ref("");
 const freeParkingMapRef = ref(null);
 const freeParkingMapInstance = ref(null);
+const freeParkingBaseLayer = ref(null);
 const freeParkingZonesLayer = ref(null);
 const freeParkingDestinationLayer = ref(null);
 const freeParkingRenderer = L.canvas({ padding: 0.5 });
@@ -114,7 +118,19 @@ watch(selectedDateInput, () => {
 
 watch(locale, () => {
   freeParkingDestinationLayer.value?.setTooltipContent(t("appName"));
+  freeParkingBaseLayer.value?.setLanguage(getMapLanguage());
 });
+
+watch(
+  [selectedDateInput, selectedWeatherTimeline],
+  async () => {
+    await nextTick();
+    requestAnimationFrame(() => {
+      scrollHourlyTimelineToCurrent();
+    });
+  },
+  { immediate: true },
+);
 
 function celsiusToFahrenheit(value) {
   return Math.round((value * 9) / 5 + 32);
@@ -217,6 +233,30 @@ function getSwitchThumbStyle(activeIndex, count) {
     width: `calc((100% - 0.5rem) / ${count})`,
     transform: `translateX(${activeIndex * 100}%)`,
   };
+}
+
+function getMapLanguage() {
+  return locale.value === "fr" ? Language.FRENCH : Language.ENGLISH;
+}
+
+function scrollHourlyTimelineToCurrent() {
+  const container = hourlyScrollRef.value;
+  if (!container || typeof window === "undefined") {
+    return;
+  }
+
+  const currentCard = container.querySelector(".hourly-card-current");
+  if (!currentCard) {
+    container.scrollTo({ left: 0, behavior: "auto" });
+    return;
+  }
+
+  const containerPadding = Number.parseFloat(window.getComputedStyle(container).paddingLeft || "0");
+  const targetLeft = Math.max(0, currentCard.offsetLeft - containerPadding);
+  container.scrollTo({
+    left: targetLeft,
+    behavior: "smooth",
+  });
 }
 
 function formatTempRange(minValue, maxValue) {
@@ -471,9 +511,10 @@ function initializeFreeParkingMap() {
     scrollWheelZoom: true,
   }).setView([freeParkingFocusCoordinates.lat, freeParkingFocusCoordinates.lon], freeParkingFocusZoom);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap contributors",
+  freeParkingBaseLayer.value = new MaptilerLayer({
+    apiKey: "MHrOc1FCCe2Eis2hviFg",
+    style: MapStyle.BASIC,
+    language: getMapLanguage(),
   }).addTo(map);
 
   freeParkingMapInstance.value = map;
@@ -497,10 +538,10 @@ function updateFreeParkingMap() {
   freeParkingZonesLayer.value = L.geoJSON(freeParkingGeoJson.value, {
     renderer: freeParkingRenderer,
     style: {
-      color: "#a61e1e",
-      weight: 3,
       fillColor: "#e34b4b",
       fillOpacity: 0.72,
+      stroke: false,
+      weight: 0,
     },
   });
 
@@ -550,6 +591,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   freeParkingMapInstance.value?.remove();
   freeParkingMapInstance.value = null;
+  freeParkingBaseLayer.value = null;
   freeParkingZonesLayer.value = null;
   freeParkingDestinationLayer.value = null;
 });
@@ -832,7 +874,7 @@ onBeforeUnmount(() => {
                     <p class="eyebrow">{{ t("hourlyDetails") }}</p>
                   </div>
 
-                  <div class="hourly-scroll-shell edge-scroll-card mt-3">
+                  <div ref="hourlyScrollRef" class="hourly-scroll-shell edge-scroll-card mt-3">
                     <div class="hourly-strip">
                       <article
                         v-for="slot in selectedWeatherTimeline"
@@ -953,20 +995,18 @@ onBeforeUnmount(() => {
 
             <div class="panel-block mt-4">
               <div class="soft-card">
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <p class="eyebrow">{{ t("freeParkingEyebrow") }}</p>
-                    <h2 class="panel-title">{{ t("freeParkingTitle") }}</h2>
-                  </div>
-                  <div class="parking-legend">
-                    <span class="parking-legend-swatch" aria-hidden="true"></span>
-                    <span>{{ t("freeParkingLegend") }}</span>
-                  </div>
+                <div>
+                  <p class="eyebrow">{{ t("freeParkingEyebrow") }}</p>
                 </div>
 
                 <p class="mt-3 text-sm leading-6 text-stone-600">
                   {{ t("freeParkingBody") }}
                 </p>
+
+                <div class="parking-legend mt-3">
+                  <span class="parking-legend-swatch" aria-hidden="true"></span>
+                  <span>{{ t("freeParkingLegend") }}</span>
+                </div>
 
                 <div v-if="hasFreeParkingZones" class="parking-map-shell mt-4">
                   <button
