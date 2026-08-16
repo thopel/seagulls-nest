@@ -1,26 +1,54 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "@maptiler/sdk/dist/maptiler-sdk.css";
-import { Language, MapStyle, MaptilerLayer } from "@maptiler/leaflet-maptilersdk";
 import WaterScene from "./components/WaterScene.vue";
+import WeatherTab from "./components/WeatherTab.vue";
+import TidesTab from "./components/TidesTab.vue";
+import InfoTab from "./components/InfoTab.vue";
+import DataDisclaimer from "./components/DataDisclaimer.vue";
+import { useStay } from "./composables/useStay";
 import { useDestinationData } from "./composables/useDestinationData";
 import { useLocale } from "./composables/useLocale";
 import { useMotionGlass } from "./composables/useMotionGlass";
 
 const { locale, localeOptions, t } = useLocale();
 const APP_VERSION = __APP_VERSION__;
+const AdminLogin = defineAsyncComponent(() => import("./components/AdminLogin.vue"));
+const AdminToolbar = defineAsyncComponent(() => import("./components/AdminToolbar.vue"));
+const AdminSettings = defineAsyncComponent(() => import("./components/AdminSettings.vue"));
+const ParkingEditor = defineAsyncComponent(() => import("./components/ParkingEditor.vue"));
+const { stay, isAdminRoute, isDisclaimerRoute, isAuthenticated } = useStay();
+const showAdminSettings = ref(false);
+const showParkingEditor = ref(false);
+const adminNotice = ref("");
+function finishSettings(slug) {
+  adminNotice.value = "Paramètres enregistrés.";
+  if (slug !== staySlugFromPath()) window.location.assign(`/${slug}/admin`);
+  else window.location.reload();
+}
+function staySlugFromPath() {
+  return window.location.pathname.split("/").filter(Boolean).at(-2);
+}
 
 const TEMPERATURE_UNIT_KEY = "coastal-companion-temperature-unit";
 const DISTANCE_UNIT_KEY = "coastal-companion-distance-unit";
+const ACTIVE_TAB_KEY = "coastal-companion-active-tab";
 
 const temperatureUnit = ref(typeof window !== "undefined" && window.localStorage.getItem(TEMPERATURE_UNIT_KEY) === "f" ? "f" : "c");
 const distanceUnit = ref(typeof window !== "undefined" && window.localStorage.getItem(DISTANCE_UNIT_KEY) === "imperial" ? "imperial" : "metric");
+const storedTab = typeof window !== "undefined" ? window.localStorage.getItem(ACTIVE_TAB_KEY) : null;
+const activeTab = ref(["weather", "tides", "info"].includes(storedTab) ? storedTab : "weather");
+const lowerTabs = computed(() => [
+  { key: "weather", label: t("weatherTab") },
+  { key: "tides", label: t("tidesTab") },
+  { key: "info", label: t("infoTab") },
+]);
 
 const {
   currentSeaTemperature,
   currentTideClock,
+  currentTideCoefficient,
   currentTideCurrent,
   currentWaterRatio,
   currentWeather,
@@ -30,7 +58,12 @@ const {
   selectedWeather,
   selectedWeatherTimeline,
   seaTemperatureError,
-  tideEvents,
+  tideDayGroups,
+  tideListLoadingPast,
+  tideListLoadingFuture,
+  canLoadPastTideDays,
+  canLoadFutureTideDays,
+  loadMoreTideDays,
   tideError,
   tideGraph,
   tideLoading,
@@ -46,6 +79,10 @@ const { tiltX, tiltY, energy, permissionState, requestMotionAccess } = useMotion
 
 const tideChartRef = ref(null);
 const hourlyScrollRef = ref(null);
+const tideListRef = ref(null);
+const tideListCentered = ref(false);
+const tideListPrepending = ref(false);
+const tideListAppending = ref(false);
 const selectedTideIndex = ref(null);
 const isDraggingTideChart = ref(false);
 const showMotionPrompt = ref(false);
@@ -58,7 +95,7 @@ const freeParkingMapInstance = ref(null);
 const freeParkingBaseLayer = ref(null);
 const freeParkingZonesLayer = ref(null);
 const freeParkingDestinationLayer = ref(null);
-const freeParkingRenderer = L.canvas({ padding: 0.5 });
+const freeParkingRenderer = L.svg({ padding: 0.5 });
 const showMotionButton = computed(() => permissionState.value === "prompt" && motionPromptDismissed.value);
 const localeActiveIndex = computed(() =>
   Math.max(
@@ -68,13 +105,10 @@ const localeActiveIndex = computed(() =>
 );
 const temperatureUnitActiveIndex = computed(() => (temperatureUnit.value === "f" ? 1 : 0));
 const distanceUnitActiveIndex = computed(() => (distanceUnit.value === "imperial" ? 1 : 0));
-const freeParkingFocusCoordinates = {
-  lat: 48.634908346770374,
-  lon: -2.0528767519268625,
-};
+const freeParkingFocusCoordinates = { lat: stay.latitude, lon: stay.longitude };
 const freeParkingFocusZoom = 17;
 const freeParkingMarkerIcon = L.icon({
-  iconUrl: `${import.meta.env.BASE_URL}assets/seegulls-nest-awake.png`,
+  iconUrl: stay.floating_image_url,
   iconSize: [58, 42],
   iconAnchor: [29, 34],
   tooltipAnchor: [0, -23],
@@ -112,13 +146,22 @@ watch(distanceUnit, (value) => {
   }
 });
 
+watch(activeTab, (value) => {
+  if (typeof window !== "undefined") window.localStorage.setItem(ACTIVE_TAB_KEY, value);
+  if (value === "tides") {
+    selectedDateInput.value = selectedDateOptions.value[0]?.key ?? new Intl.DateTimeFormat("fr-CA").format(new Date());
+  }
+  if (value === "weather" && !selectedDateOptions.value.some((day) => day.key === selectedDateInput.value)) {
+    selectedDateInput.value = selectedDateOptions.value[0]?.key ?? selectedDateInput.value;
+  }
+});
+
 watch(selectedDateInput, () => {
   selectedTideIndex.value = null;
 });
 
 watch(locale, () => {
   freeParkingDestinationLayer.value?.setTooltipContent(t("appName"));
-  freeParkingBaseLayer.value?.setLanguage(getMapLanguage());
 });
 
 watch(
@@ -235,10 +278,6 @@ function getSwitchThumbStyle(activeIndex, count) {
   };
 }
 
-function getMapLanguage() {
-  return locale.value === "fr" ? Language.FRENCH : Language.ENGLISH;
-}
-
 function scrollHourlyTimelineToCurrent() {
   const container = hourlyScrollRef.value;
   if (!container || typeof window === "undefined") {
@@ -274,24 +313,10 @@ function formatTempRange(minValue, maxValue) {
   return `${formatTemperature(minValue)}° / ${formatTemperature(maxValue)}°`;
 }
 
-const stats = computed(() => [
-  {
-    key: "humidity",
-    value: `${currentWeather.value?.humidity ?? "--"}%`,
-  },
-  {
-    key: "wind",
-    value: formatWind(currentWeather.value?.windKmh),
-  },
-  {
-    key: "visibility",
-    value: formatVisibility(currentWeather.value?.visibilityKm),
-  },
-]);
-
 const selectedWeatherConditionLabel = computed(() =>
   weatherLoading.value ? t("gentleBreeze") : (selectedWeather.value?.condition ?? t("weatherUnavailable")),
 );
+const currentTideHighlights = computed(() => [currentTideClock.value?.previousEvent, currentTideClock.value?.nextEvent].filter(Boolean));
 const hasFreeParkingZones = computed(() => Array.isArray(freeParkingGeoJson.value?.features) && freeParkingGeoJson.value.features.length > 0);
 
 const selectedWeatherStats = computed(() => [
@@ -307,16 +332,8 @@ const selectedWeatherStats = computed(() => [
         : `${formatTemperature(selectedWeather.value.feelsLike)}°`,
   },
   {
-    key: "humidity",
-    value: formatPercent(selectedWeather.value?.humidity),
-  },
-  {
     key: "wind",
     value: formatWind(selectedWeather.value?.windKmh),
-  },
-  {
-    key: "visibility",
-    value: formatVisibility(selectedWeather.value?.visibilityKm),
   },
   {
     key: "cloudCover",
@@ -325,10 +342,6 @@ const selectedWeatherStats = computed(() => [
   {
     key: "rainChance",
     value: formatPercent(selectedWeather.value?.rainProbability),
-  },
-  {
-    key: "pressure",
-    value: formatPressure(selectedWeather.value?.pressure),
   },
 ]);
 
@@ -476,6 +489,70 @@ function selectAvailableDay(key) {
   selectedDateInput.value = key;
 }
 
+function formatTideDayLabel(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Intl.DateTimeFormat(locale.value === "en" ? "en-GB" : "fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date(year, month - 1, day, 12));
+}
+
+async function onTideListScroll(event) {
+  const container = event.currentTarget;
+  if (container.scrollTop < 120 && !tideListLoadingPast.value && !tideListPrepending.value) {
+    const cards = Array.from(container.querySelectorAll(".tide-day-card"));
+    const anchor = cards.find((card) => card.offsetTop + card.offsetHeight > container.scrollTop) ?? cards[0];
+    const anchorKey = anchor?.getAttribute("data-tide-key");
+    const anchorViewportOffset = anchor ? anchor.offsetTop - container.scrollTop : 0;
+    tideListPrepending.value = true;
+    try {
+      await loadMoreTideDays("past");
+      await nextTick();
+      const restoredAnchor = anchorKey ? container.querySelector(`[data-tide-key="${anchorKey}"]`) : null;
+      if (restoredAnchor) container.scrollTop = restoredAnchor.offsetTop - anchorViewportOffset;
+    } finally {
+      requestAnimationFrame(() => {
+        tideListPrepending.value = false;
+      });
+    }
+  }
+  if (container.scrollHeight - container.scrollTop - container.clientHeight < 160 && !tideListLoadingFuture.value && !tideListAppending.value) {
+    tideListAppending.value = true;
+    try {
+      await loadMoreTideDays("future");
+    } finally {
+      requestAnimationFrame(() => {
+        tideListAppending.value = false;
+      });
+    }
+  }
+}
+
+function scrollTideListToToday() {
+  const container = tideListRef.value;
+  const todayCard = container?.querySelector("[data-tide-today='true']");
+  if (!container || !todayCard) return;
+  container.scrollTo({
+    top: Math.max(0, todayCard.offsetTop - container.offsetTop - 16),
+    behavior: "smooth",
+  });
+}
+
+watch(
+  [activeTab, () => tideDayGroups.value.length],
+  async ([tab]) => {
+    if (tab !== "tides" || tideListCentered.value) return;
+    await nextTick();
+    const todayCard = tideListRef.value?.querySelector("[data-tide-today='true']");
+    if (todayCard) {
+      tideListRef.value.scrollTop = Math.max(0, todayCard.offsetTop - tideListRef.value.offsetTop - 16);
+      tideListCentered.value = true;
+    }
+  },
+  { immediate: true },
+);
+
 async function enableMotionPrompt() {
   if (motionPromptPending.value) {
     return;
@@ -506,15 +583,14 @@ function initializeFreeParkingMap() {
 
   const map = L.map(freeParkingMapRef.value, {
     zoomControl: true,
-    preferCanvas: true,
+    preferCanvas: false,
     renderer: freeParkingRenderer,
     scrollWheelZoom: true,
   }).setView([freeParkingFocusCoordinates.lat, freeParkingFocusCoordinates.lon], freeParkingFocusZoom);
 
-  freeParkingBaseLayer.value = new MaptilerLayer({
-    apiKey: "MHrOc1FCCe2Eis2hviFg",
-    style: MapStyle.BASIC,
-    language: getMapLanguage(),
+  freeParkingBaseLayer.value = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 20,
+    attribution: "© OpenStreetMap contributors",
   }).addTo(map);
 
   freeParkingMapInstance.value = map;
@@ -537,12 +613,10 @@ function updateFreeParkingMap() {
 
   freeParkingZonesLayer.value = L.geoJSON(freeParkingGeoJson.value, {
     renderer: freeParkingRenderer,
-    style: {
-      fillColor: "#e34b4b",
-      fillOpacity: 0.72,
-      stroke: false,
-      weight: 0,
-    },
+    style: (feature) =>
+      feature?.geometry?.type === "LineString" || feature?.geometry?.type === "MultiLineString"
+        ? { color: "#d83b3b", opacity: 0.9, weight: 9, lineCap: "round", lineJoin: "round" }
+        : { fillColor: "#e34b4b", fillOpacity: 0.72, stroke: false, weight: 0 },
   });
 
   freeParkingZonesLayer.value.addTo(freeParkingMapInstance.value);
@@ -569,6 +643,13 @@ async function loadFreeParkingGeoJson() {
   freeParkingError.value = "";
 
   try {
+    if (stay.parking_geojson) {
+      freeParkingGeoJson.value = stay.parking_geojson;
+      await nextTick();
+      initializeFreeParkingMap();
+      updateFreeParkingMap();
+      return;
+    }
     const response = await fetch(`${import.meta.env.BASE_URL}freepark.geojson`);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -598,7 +679,20 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="stable-screen-min-height bg-page text-stone-800" :style="pageStyle">
+  <DataDisclaimer v-if="isDisclaimerRoute" :stay-name="stay.name" :back-url="`/${stay.slug}`" />
+  <AdminLogin v-else-if="isAdminRoute && !isAuthenticated" />
+  <div v-else class="stable-screen-min-height bg-page text-stone-800" :class="{ 'admin-mode': isAdminRoute }" :style="pageStyle">
+    <AdminToolbar v-if="isAdminRoute" @settings="showAdminSettings = true" @parking="showParkingEditor = true" />
+    <AdminSettings v-if="showAdminSettings" @close="showAdminSettings = false" @saved="finishSettings" />
+    <ParkingEditor
+      v-if="showParkingEditor"
+      @close="showParkingEditor = false"
+      @saved="
+        loadFreeParkingGeoJson();
+        adminNotice = 'Rues enregistrées.';
+      "
+    />
+    <p v-if="adminNotice" class="admin-toast" role="status">{{ adminNotice }}</p>
     <div
       v-if="showMotionPrompt"
       class="fixed inset-0 z-[80] flex items-end bg-[#102038]/40 p-4 backdrop-blur-sm"
@@ -638,7 +732,15 @@ onBeforeUnmount(() => {
 
     <main class="app-shell mx-auto flex w-full flex-col gap-4">
       <section class="app-hero-shell phone-shell relative isolate shadow-shell">
-        <WaterScene :sky-color="skyPalette.phone" :water-ratio="currentWaterRatio" :tilt-x="tiltX" :tilt-y="tiltY" :energy="energy" />
+        <WaterScene
+          :floating-image-url="stay.floating_image_url"
+          :floating-image-asleep-url="stay.floating_image_asleep_url"
+          :sky-color="skyPalette.phone"
+          :water-ratio="currentWaterRatio"
+          :tilt-x="tiltX"
+          :tilt-y="tiltY"
+          :energy="energy"
+        />
 
         <div class="stable-screen-min-height relative z-10 flex flex-col justify-between p-5 pb-14 sm:p-6">
           <div class="space-y-4">
@@ -714,6 +816,7 @@ onBeforeUnmount(() => {
             <div class="flex items-start justify-between gap-2">
               <div>
                 <p class="text-sm uppercase tracking-[0.32em] text-white/75">{{ t("today") }}</p>
+                <p class="mt-1 text-xs font-semibold uppercase tracking-[0.22em] text-white/85">{{ t("inTheAir") }}</p>
                 <div class="flex items-start gap-3">
                   <span class="font-display text-[6.5rem] leading-none text-white drop-shadow-title">
                     {{ displayedTemperature }}
@@ -724,9 +827,6 @@ onBeforeUnmount(() => {
 
               <div class="flex flex-col items-end gap-2 pt-2">
                 <img v-if="currentWeather?.animatedIcon" :src="currentWeather.animatedIcon" alt="" class="weather-hero-icon" aria-hidden="true" />
-                <p class="condition-pill">
-                  {{ weatherConditionLabel }}
-                </p>
               </div>
             </div>
           </div>
@@ -766,24 +866,32 @@ onBeforeUnmount(() => {
                 />
               </svg>
               <div class="flex flex-col items-end">
+                <p class="mb-1 text-xs font-semibold uppercase tracking-[0.22em] text-white/85 drop-shadow-title">{{ t("inTheWater") }}</p>
                 <div class="flex">
                   <span class="font-display text-[6.5rem] leading-none text-white drop-shadow-title">
                     {{ formatSeaTemperature(currentSeaTemperature) }}
                   </span>
                   <span class="mt-4 font-display text-4xl text-white drop-shadow-title">&deg;{{ temperatureUnitLabel }}</span>
                 </div>
-                <p class="mt-2 pl-1 font-display text-2xl text-white/92 drop-shadow-title">
-                  {{ formatTideHeight(currentTideCurrent?.height) }}
-                </p>
+                <div class="mt-2 flex items-center gap-2">
+                  <p class="pl-1 font-display text-2xl text-white/92 drop-shadow-title">
+                    {{ formatTideHeight(currentTideCurrent?.height) }}
+                  </p>
+                  <p v-if="currentTideCoefficient !== null" class="current-tide-coefficient">{{ t("coefficientShort") }} {{ currentTideCoefficient }}</p>
+                </div>
               </div>
             </div>
 
-            <div class="hero-stats-grid grid grid-cols-3 gap-2">
-              <article v-for="item in stats" :key="item.key" class="glass-tile hero-stat-tile">
-                <p class="hero-stat-value font-display text-stone-800">{{ item.value }}</p>
-                <p class="hero-stat-label mt-1 font-semibold uppercase tracking-[0.18em] text-stone-600">
-                  {{ t(item.key) }}
-                </p>
+            <div class="hero-stats-grid grid grid-cols-2 gap-2">
+              <article v-for="event in currentTideHighlights" :key="event.time" class="tide-summary-card">
+                <div class="tide-summary-heading">
+                  <span>{{ event.kind === "high" ? t("highTideFull") : t("lowTideFull") }}</span>
+                  <span v-if="event.coef !== null && event.coef !== undefined" class="tide-summary-coef">{{ t("coefficientShort") }} {{ event.coef }}</span>
+                </div>
+                <div class="tide-summary-values">
+                  <p class="tide-summary-time">{{ helpers.toHourMinute(new Date(event.time)) }}</p>
+                  <p class="tide-summary-height">{{ formatTideHeight(event.height) }}</p>
+                </div>
               </article>
             </div>
           </div>
@@ -792,288 +900,324 @@ onBeforeUnmount(() => {
 
       <section class="app-panels panel-stack">
         <article class="paper-panel">
-          <div class="panel-scroll">
-            <div class="date-selector-shell panel-block">
-              <div class="pe-4">
-                <p class="mt-2 font-display text-2xl text-stone-800">{{ selectedLabel }}</p>
-                <p class="mt-1 text-sm text-stone-500">{{ t("availableWindow") }}</p>
-              </div>
+          <div class="panel-scroll" :class="{ 'panel-scroll-tides': activeTab === 'tides' }">
+            <nav class="lower-tabs" :aria-label="t('contentTabs')">
+              <button
+                v-for="tab in lowerTabs"
+                :key="tab.key"
+                type="button"
+                class="lower-tab"
+                :class="{ 'lower-tab-active': activeTab === tab.key }"
+                @click="activeTab = tab.key"
+              >
+                {{ tab.label }}
+              </button>
+            </nav>
 
-              <div class="edge-scroll min-w-0 pb-1">
-                <div class="day-pill-track">
-                  <button
-                    v-for="day in selectedDateOptions"
-                    :key="day.key"
-                    type="button"
-                    class="day-pill"
-                    :class="{ 'day-pill-active': day.key === selectedDateInput }"
-                    :title="day.fullLabel"
-                    @click="selectAvailableDay(day.key)"
-                  >
-                    {{ day.label }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div class="panel-block my-5">
-              <div class="soft-card">
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <p class="eyebrow">{{ t("dayWeather") }}</p>
-                    <h3 class="mt-1 font-display text-2xl text-stone-800">{{ selectedLabel }}</h3>
-                  </div>
-                  <img v-if="selectedWeather?.animatedIcon" :src="selectedWeather.animatedIcon" alt="" class="weather-panel-icon" aria-hidden="true" />
-                </div>
-
-                <div class="mt-4 flex items-end justify-between gap-3">
-                  <div>
-                    <div class="flex items-start gap-2">
-                      <span class="font-display text-5xl leading-none text-stone-800">
-                        {{ formatTemperature(selectedWeather?.temp) }}
-                      </span>
-                      <span class="mt-1 font-display text-2xl text-stone-700">&deg;{{ temperatureUnitLabel }}</span>
-                    </div>
-                    <p class="mt-2 rounded-full bg-[#fbf5df] px-3 py-2 text-sm font-semibold text-stone-700">
-                      {{ selectedWeatherConditionLabel }}
-                    </p>
-                  </div>
-
-                  <div class="rounded-[1.3rem] bg-white/75 px-4 py-3 text-right">
-                    <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("rainfall") }}</p>
-                    <p class="mt-1 font-display text-2xl text-stone-800">{{ formatPrecipitation(selectedWeather?.precipitationMm) }}</p>
-                  </div>
-                </div>
-
-                <div class="mt-4 grid grid-cols-2 gap-2">
-                  <article v-for="item in selectedWeatherStats" :key="item.key" class="glass-tile day-detail-tile">
-                    <p class="text-lg font-display text-stone-800">{{ item.value }}</p>
-                    <p class="mt-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-stone-600">
-                      {{ t(item.key) }}
-                    </p>
-                  </article>
-                </div>
-
-                <div v-if="selectedWeather?.sunrise || selectedWeather?.sunset" class="mt-4 grid grid-cols-2 gap-2 rounded-[1.4rem] bg-white/70 p-3">
-                  <div>
-                    <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("sunrise") }}</p>
-                    <p class="mt-1 font-display text-xl text-stone-800">
-                      {{ selectedWeather?.sunrise ? helpers.toHourMinute(new Date(selectedWeather.sunrise)) : "--" }}
-                    </p>
-                  </div>
-                  <div class="text-right">
-                    <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("sunset") }}</p>
-                    <p class="mt-1 font-display text-xl text-stone-800">
-                      {{ selectedWeather?.sunset ? helpers.toHourMinute(new Date(selectedWeather.sunset)) : "--" }}
-                    </p>
-                  </div>
-                </div>
-
-                <div v-if="selectedWeatherTimeline.length" class="mt-4">
-                  <div class="flex items-baseline justify-start gap-3">
-                    <p class="eyebrow">{{ t("hourlyDetails") }}</p>
-                  </div>
-
-                  <div ref="hourlyScrollRef" class="hourly-scroll-shell edge-scroll-card mt-3">
-                    <div class="hourly-strip">
-                      <article
-                        v-for="slot in selectedWeatherTimeline"
-                        :key="`${slot.time}-${slot.label}`"
-                        class="hourly-card"
-                        :class="{ 'hourly-card-current': slot.isCurrent }"
+            <div v-if="activeTab !== 'info'" class="daily-data-block">
+              <WeatherTab v-if="activeTab === 'weather'" :title="t('weatherTab')">
+                <div class="date-selector-shell panel-block">
+                  <div class="edge-scroll min-w-0 pb-1">
+                    <div class="day-pill-track">
+                      <button
+                        v-for="day in selectedDateOptions"
+                        :key="day.key"
+                        type="button"
+                        class="day-pill"
+                        :class="{ 'day-pill-active': day.key === selectedDateInput }"
+                        :title="day.fullLabel"
+                        @click="selectAvailableDay(day.key)"
                       >
-                        <p class="hourly-time">{{ slot.label }}</p>
-                        <img v-if="slot.animatedIcon" :src="slot.animatedIcon" alt="" class="hourly-weather-icon" aria-hidden="true" />
-                        <p class="hourly-temp">{{ formatTemperature(slot.temp) }}&deg;</p>
-                        <p class="hourly-meta">{{ formatPercent(slot.rainProbability) }}</p>
-                      </article>
+                        {{ day.label }}
+                      </button>
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            <div class="panel-block">
-              <div class="soft-card">
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <p class="eyebrow">{{ t("tideCurve") }}</p>
-                  </div>
-                  <button
-                    type="button"
-                    class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#fbf5df] text-stone-600 transition disabled:cursor-default disabled:opacity-55"
-                    :disabled="isCurrentTideView"
-                    :aria-label="t('chartNow')"
-                    :title="t('chartNow')"
-                    @click="resetTideChartSelection"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      class="h-4.5 w-4.5"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-                      <path d="M21 3v6h-6" />
-                    </svg>
-                    <span class="sr-only">{{ t("chartNow") }}</span>
-                  </button>
-                </div>
-
-                <div class="tide-chart-wrap mt-4 rounded-[1.7rem] bg-[#fff9ea] p-4 shadow-inner-soft">
-                  <div
-                    ref="tideChartRef"
-                    class="tide-chart-canvas"
-                    @click="onTideChartClick"
-                    @pointerdown="startTideChartDrag"
-                    @pointermove="dragTideChart"
-                    @pointerup="stopTideChartDrag"
-                    @pointercancel="stopTideChartDrag"
-                  >
-                    <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="h-44 w-full overflow-visible" aria-hidden="true">
-                      <defs>
-                        <linearGradient id="tideStroke" x1="0%" x2="100%" y1="0%" y2="0%">
-                          <stop offset="0%" stop-color="#62c3be" />
-                          <stop offset="100%" stop-color="#3d84a8" />
-                        </linearGradient>
-                      </defs>
-                      <polyline fill="none" stroke="url(#tideStroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" :points="tideGraph" />
-                      <template v-if="activeTidePoint">
-                        <line :x1="activeTidePoint.x" y1="0" :x2="activeTidePoint.x" y2="100" stroke="#e58f64" stroke-dasharray="2 3" stroke-width="1.3" />
-                      </template>
-                    </svg>
-
-                    <div v-if="activeTidePoint" class="tide-chart-dot" :style="{ left: `${activeTidePoint.x}%`, top: `${activeTidePoint.y}%` }"></div>
-                  </div>
-
-                  <div class="mt-3 flex justify-between text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
-                    <span>00:00</span>
-                    <span>12:00</span>
-                    <span>23:59</span>
-                  </div>
-
-                  <div v-if="activeTidePoint" class="mt-3 rounded-full bg-[#eb9b73] px-4 py-2 text-sm font-semibold text-white">
-                    {{ t("chartSelection") }}:
-                    {{ helpers.toHourMinute(new Date(activeTidePoint.time)) }}
-                    -
-                    {{ formatTideHeight(activeTidePoint.height) }}
-                  </div>
-                  <p v-else class="mt-3 text-sm text-stone-500">{{ t("tapChart") }}</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="panel-block mt-4">
-              <div class="soft-card">
-                <p class="eyebrow">{{ t("highlights") }}</p>
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                  <article v-for="turn in tideEvents" :key="turn.time" class="turn-card">
-                    <div>
-                      <p class="font-display text-xl text-stone-800">{{ formatTideHeight(turn.height) }}</p>
-                      <p class="text-xs uppercase tracking-[0.18em] text-stone-500">
-                        {{ turn.kind === "high" ? t("highTideFull") : t("lowTideFull") }}
-                      </p>
-                    </div>
-                    <p class="rounded-full bg-white/80 px-3 py-1 text-sm font-semibold text-stone-700">
-                      {{ helpers.toHourMinute(new Date(turn.time)) }}
-                    </p>
-                  </article>
-                </div>
-
-                <p v-if="!tideEvents.length && !tideLoading && !tideError" class="mt-4 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
-                  {{ t("noTideData") }}
-                </p>
-                <p v-if="tideError" class="mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
-                  {{ tideError }}
-                </p>
-              </div>
-            </div>
-
-            <div class="panel-block mt-4">
-              <div class="soft-card">
-                <div>
-                  <p class="eyebrow">{{ t("freeParkingEyebrow") }}</p>
-                </div>
-
-                <p class="mt-3 text-sm leading-6 text-stone-600">
-                  {{ t("freeParkingBody") }}
-                </p>
-
-                <div class="parking-legend mt-3">
-                  <span class="parking-legend-swatch" aria-hidden="true"></span>
-                  <span>{{ t("freeParkingLegend") }}</span>
-                </div>
-
-                <div v-if="hasFreeParkingZones" class="parking-map-shell mt-4">
-                  <button
-                    type="button"
-                    class="parking-map-recenter"
-                    :aria-label="t('freeParkingRecenter')"
-                    @click="recenterFreeParkingMap"
-                  >
-                    {{ t("freeParkingRecenter") }}
-                  </button>
-                  <div ref="freeParkingMapRef" class="parking-map-canvas" :aria-label="t('freeParkingTitle')"></div>
-                </div>
-
-                <p v-else-if="freeParkingError" class="mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
-                  {{ freeParkingError }}
-                </p>
-
-                <p v-else class="mt-4 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
-                  {{ t("freeParkingEmpty") }}
-                </p>
-
-                <p class="parking-disclaimer mt-4">
-                  {{ t("freeParkingDisclaimer") }}
-                </p>
-              </div>
-            </div>
-
-            <div class="panel-block mt-4">
-              <div class="soft-card">
-                <div class="flex items-start justify-between gap-4">
-                  <div>
-                    <p class="eyebrow">{{ t("usefulInfo") }}</p>
-                  </div>
-                </div>
-
-                <div class="mt-5 grid gap-3 md:grid-cols-2">
-                  <a v-for="link in usefulLinks" :key="link.id" :href="link.url" class="event-card block no-underline" target="_blank" rel="noreferrer">
-                    <div v-if="link.tag" class="flex items-start justify-between gap-3">
-                      <div class="flex flex-wrap items-center gap-2">
-                        <span class="event-tag">{{ link.tag }}</span>
+                <div class="panel-block daily-data-section">
+                  <div class="soft-card">
+                    <div class="flex items-start justify-between gap-3">
+                      <div>
+                        <p class="eyebrow">{{ t("dayWeather") }}</p>
+                        <h3 class="mt-1 font-display text-2xl text-stone-800">{{ selectedLabel }}</h3>
+                      </div>
+                      <div class="flex flex-col items-end gap-1">
+                        <img v-if="selectedWeather?.animatedIcon" :src="selectedWeather.animatedIcon" alt="" class="weather-panel-icon" aria-hidden="true" />
+                        <p class="rounded-full bg-[#fbf5df] px-3 py-2 text-sm font-semibold text-stone-700">
+                          {{ selectedWeatherConditionLabel }}
+                        </p>
                       </div>
                     </div>
-                    <h3 class="font-display text-2xl text-stone-800">{{ link.title }}</h3>
-                    <p v-if="link.description" class="mt-3 text-sm leading-6 text-stone-600">{{ link.description }}</p>
-                    <div class="mt-4 flex items-center justify-between gap-3">
-                      <p class="text-xs uppercase tracking-[0.16em] text-stone-500">{{ link.sourceLabel }}</p>
-                      <p class="rounded-full bg-[#eb9b73] px-3 py-2 text-sm font-semibold text-white">{{ t("openLink") }}</p>
-                    </div>
-                  </a>
 
-                  <article v-if="!usefulLinks.length" class="event-card md:col-span-2">
-                    <h3 class="font-display text-2xl text-stone-800">{{ t("usefulLinksEmptyTitle") }}</h3>
-                    <p class="mt-3 text-sm leading-6 text-stone-600">{{ t("usefulLinksEmptyBody") }}</p>
-                  </article>
+                    <div class="mt-4 flex items-end justify-between gap-3">
+                      <div>
+                        <div class="flex items-start gap-2">
+                          <span class="font-display text-5xl leading-none text-stone-800">
+                            {{ formatTemperature(selectedWeather?.temp) }}
+                          </span>
+                          <span class="mt-1 font-display text-2xl text-stone-700">&deg;{{ temperatureUnitLabel }}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="mt-4 grid grid-cols-2 gap-2">
+                      <article v-for="item in selectedWeatherStats" :key="item.key" class="glass-tile day-detail-tile">
+                        <p class="text-lg font-display text-stone-800">{{ item.value }}</p>
+                        <p class="mt-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-stone-600">
+                          {{ t(item.key) }}
+                        </p>
+                      </article>
+                      <article class="glass-tile day-detail-tile">
+                        <p class="text-lg font-display text-stone-800">{{ formatPrecipitation(selectedWeather?.precipitationMm) }}</p>
+                        <p class="mt-1 text-[0.72rem] font-semibold uppercase tracking-[0.18em] text-stone-600">
+                          {{ t("rainfall") }}
+                        </p>
+                      </article>
+                    </div>
+
+                    <div v-if="selectedWeather?.sunrise || selectedWeather?.sunset" class="mt-4 grid grid-cols-2 gap-2 rounded-[1.4rem] bg-white/70 p-3">
+                      <div>
+                        <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("sunrise") }}</p>
+                        <p class="mt-1 font-display text-xl text-stone-800">
+                          {{ selectedWeather?.sunrise ? helpers.toHourMinute(new Date(selectedWeather.sunrise)) : "--" }}
+                        </p>
+                      </div>
+                      <div class="text-right">
+                        <p class="text-[0.72rem] font-semibold uppercase tracking-[0.16em] text-stone-500">{{ t("sunset") }}</p>
+                        <p class="mt-1 font-display text-xl text-stone-800">
+                          {{ selectedWeather?.sunset ? helpers.toHourMinute(new Date(selectedWeather.sunset)) : "--" }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div v-if="selectedWeatherTimeline.length" class="mt-4">
+                      <div class="flex items-baseline justify-start gap-3">
+                        <p class="eyebrow">{{ t("hourlyDetails") }}</p>
+                      </div>
+
+                      <div ref="hourlyScrollRef" class="hourly-scroll-shell edge-scroll-card mt-3">
+                        <div class="hourly-strip">
+                          <article
+                            v-for="slot in selectedWeatherTimeline"
+                            :key="`${slot.time}-${slot.label}`"
+                            class="hourly-card"
+                            :class="{ 'hourly-card-current': slot.isCurrent }"
+                          >
+                            <p class="hourly-time">{{ slot.label }}</p>
+                            <img v-if="slot.animatedIcon" :src="slot.animatedIcon" alt="" class="hourly-weather-icon" aria-hidden="true" />
+                            <p class="hourly-temp">{{ formatTemperature(slot.temp) }}&deg;</p>
+                            <p class="hourly-meta">{{ formatPercent(slot.rainProbability) }}</p>
+                          </article>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="panel-block daily-data-section">
+                  <div class="soft-card">
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <p class="eyebrow">{{ t("tideCurve") }}</p>
+                      </div>
+                      <button
+                        type="button"
+                        class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#fbf5df] text-stone-600 transition disabled:cursor-default disabled:opacity-55"
+                        :disabled="isCurrentTideView"
+                        :aria-label="t('chartNow')"
+                        :title="t('chartNow')"
+                        @click="resetTideChartSelection"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          class="h-4.5 w-4.5"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2.2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+                          <path d="M21 3v6h-6" />
+                        </svg>
+                        <span class="sr-only">{{ t("chartNow") }}</span>
+                      </button>
+                    </div>
+
+                    <div class="tide-chart-wrap mt-4 rounded-[1.7rem] bg-[#fff9ea] p-4 shadow-inner-soft">
+                      <div
+                        ref="tideChartRef"
+                        class="tide-chart-canvas"
+                        @click="onTideChartClick"
+                        @pointerdown="startTideChartDrag"
+                        @pointermove="dragTideChart"
+                        @pointerup="stopTideChartDrag"
+                        @pointercancel="stopTideChartDrag"
+                      >
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="h-44 w-full overflow-visible" aria-hidden="true">
+                          <defs>
+                            <linearGradient id="tideStroke" x1="0%" x2="100%" y1="0%" y2="0%">
+                              <stop offset="0%" stop-color="#62c3be" />
+                              <stop offset="100%" stop-color="#3d84a8" />
+                            </linearGradient>
+                          </defs>
+                          <polyline fill="none" stroke="url(#tideStroke)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" :points="tideGraph" />
+                          <template v-if="activeTidePoint">
+                            <line :x1="activeTidePoint.x" y1="0" :x2="activeTidePoint.x" y2="100" stroke="#e58f64" stroke-dasharray="2 3" stroke-width="1.3" />
+                          </template>
+                        </svg>
+
+                        <div v-if="activeTidePoint" class="tide-chart-dot" :style="{ left: `${activeTidePoint.x}%`, top: `${activeTidePoint.y}%` }"></div>
+                      </div>
+
+                      <div class="mt-3 flex justify-between text-xs font-semibold uppercase tracking-[0.16em] text-stone-500">
+                        <span>00:00</span>
+                        <span>12:00</span>
+                        <span>23:59</span>
+                      </div>
+
+                      <div v-if="activeTidePoint" class="mt-3 rounded-full bg-[#eb9b73] px-4 py-2 text-sm font-semibold text-white">
+                        {{ t("chartSelection") }}:
+                        {{ helpers.toHourMinute(new Date(activeTidePoint.time)) }}
+                        -
+                        {{ formatTideHeight(activeTidePoint.height) }}
+                      </div>
+                      <p v-else class="mt-3 text-sm text-stone-500">{{ t("tapChart") }}</p>
+                    </div>
+                  </div>
+                </div>
+              </WeatherTab>
+
+              <TidesTab v-else-if="activeTab === 'tides'" :title="t('tidesTab')">
+                <div class="panel-block daily-data-section">
+              <div ref="tideListRef" class="tide-infinite-list" @scroll.passive="onTideListScroll">
+                    <button type="button" class="tide-today-button" :aria-label="t('backToToday')" :title="t('backToToday')" @click="scrollTideListToToday">
+                      <span aria-hidden="true">{{ t("todayShort") }}</span>
+                </button>
+                <p v-if="!canLoadPastTideDays" class="tide-list-boundary">{{ t("noMorePastTides") }}</p>
+                <p v-if="tideListLoadingPast" class="tide-list-loading">{{ t("loadingPreviousTides") }}</p>
+                    <article
+                      v-for="day in tideDayGroups"
+                      :key="day.key"
+                      class="tide-day-card"
+                      :class="{ 'tide-day-card-today': day.isToday }"
+                      :data-tide-today="day.isToday"
+                      :data-tide-key="day.key"
+                    >
+                      <header class="tide-day-header">
+                        <h3>{{ formatTideDayLabel(day.key) }}</h3>
+                        <span v-if="day.isToday">{{ t("todayShort") }}</span>
+                  </header>
+                  <div class="tide-day-events">
+                    <div
+                      v-for="turn in day.events"
+                      :key="turn.time"
+                      class="tide-list-event"
+                      :class="turn.kind === 'high' ? 'tide-list-event-high' : 'tide-list-event-low'"
+                    >
+                      <p class="tide-list-event-kind">{{ turn.kind === "high" ? t("highTideFull") : t("lowTideFull") }}</p>
+                      <p class="tide-list-event-time">{{ helpers.toHourMinute(new Date(turn.time)) }}</p>
+                      <p class="tide-list-event-height">{{ formatTideHeight(turn.height) }}</p>
+                      <p v-if="turn.coef !== null && turn.coef !== undefined" class="tide-list-event-coef">{{ t("coefficientShort") }} {{ turn.coef }}</p>
+                    </div>
+                  </div>
+                </article>
+                <p v-if="tideListLoadingFuture" class="tide-list-loading">{{ t("loadingNextTides") }}</p>
+                <p v-if="!canLoadFutureTideDays" class="tide-list-boundary">{{ t("noMoreFutureTides") }}</p>
+                <p v-if="tideError" class="tide-list-error">{{ tideError }}</p>
+                  </div>
+                </div>
+              </TidesTab>
+            </div>
+
+            <InfoTab v-if="activeTab === 'info'" :title="t('infoTab')" class="info-tab-content">
+              <div class="panel-block mt-4 info-parking-card">
+                <div class="soft-card admin-parking-card-shell">
+                  <button v-if="isAdminRoute" type="button" class="admin-parking-edit" aria-label="Gérer les rues de stationnement" title="Gérer les rues" @click="showParkingEditor = true">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.5 17V7h3.2a3 3 0 0 1 0 6H9.5m0 0h3.2" /></svg>
+                  </button>
+                  <div>
+                    <p class="eyebrow">{{ t("freeParkingEyebrow") }}</p>
+                  </div>
+
+                  <p class="mt-3 text-sm leading-6 text-stone-600">
+                    {{ t("freeParkingBody") }}
+                  </p>
+
+                  <div class="parking-legend mt-3">
+                    <span class="parking-legend-swatch" aria-hidden="true"></span>
+                    <span>{{ t("freeParkingLegend") }}</span>
+                  </div>
+
+                  <div v-if="hasFreeParkingZones || isAdminRoute" class="parking-map-shell mt-4">
+                    <button type="button" class="parking-map-recenter" :aria-label="t('freeParkingRecenter')" @click="recenterFreeParkingMap">
+                      {{ t("freeParkingRecenter") }}
+                    </button>
+                    <div ref="freeParkingMapRef" class="parking-map-canvas" :aria-label="t('freeParkingTitle')"></div>
+                  </div>
+
+                  <p v-else-if="freeParkingError" class="mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
+                    {{ freeParkingError }}
+                  </p>
+
+                  <p v-else class="mt-4 rounded-2xl bg-stone-100 px-4 py-3 text-sm text-stone-700">
+                    {{ t("freeParkingEmpty") }}
+                  </p>
+
+                  <p class="parking-disclaimer mt-4">
+                    {{ t("freeParkingDisclaimer") }}
+                  </p>
                 </div>
               </div>
-            </div>
 
-            <div class="panel-block mt-4">
-              <div class="soft-card story-card">
-                <p class="eyebrow">{{ t("storyEyebrow") }}</p>
-                <h2 class="panel-title">{{ t("storyTitle") }}</h2>
-                <p class="mt-3 text-sm leading-7 text-stone-600">
-                  {{ t("storyBody") }}
-                </p>
+              <div class="panel-block mt-4 info-links-card">
+                <div class="soft-card">
+                  <div class="flex items-start justify-between gap-4">
+                    <div>
+                      <p class="eyebrow">{{ t("usefulInfo") }}</p>
+                    </div>
+                  </div>
+
+                  <div class="mt-5 grid gap-3 md:grid-cols-2">
+                    <a v-for="link in usefulLinks" :key="link.id" :href="link.url" class="event-card block no-underline" target="_blank" rel="noreferrer">
+                      <div v-if="link.tag" class="flex items-start justify-between gap-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                          <span class="event-tag">{{ link.tag }}</span>
+                        </div>
+                      </div>
+                      <h3 class="font-display text-2xl text-stone-800">{{ link.title }}</h3>
+                      <p v-if="link.description" class="mt-3 text-sm leading-6 text-stone-600">{{ link.description }}</p>
+                      <div class="mt-4 flex items-center justify-between gap-3">
+                        <p class="text-xs uppercase tracking-[0.16em] text-stone-500">{{ link.sourceLabel }}</p>
+                        <p class="rounded-full bg-[#eb9b73] px-3 py-2 text-sm font-semibold text-white">{{ t("openLink") }}</p>
+                      </div>
+                    </a>
+
+                    <article v-if="!usefulLinks.length" class="event-card md:col-span-2">
+                      <h3 class="font-display text-2xl text-stone-800">{{ t("usefulLinksEmptyTitle") }}</h3>
+                      <p class="mt-3 text-sm leading-6 text-stone-600">{{ t("usefulLinksEmptyBody") }}</p>
+                    </article>
+                  </div>
+                </div>
               </div>
-            </div>
+
+              <div class="panel-block mt-4 info-story-card">
+                <div class="soft-card story-card">
+                  <p class="eyebrow">{{ t("storyEyebrow") }}</p>
+                  <h2 class="panel-title">{{ t("storyTitle") }}</h2>
+                  <p class="mt-3 text-sm leading-7 text-stone-600">
+                    {{ t("storyBody") }}
+                  </p>
+                </div>
+              </div>
+              <footer class="panel-block mt-4 space-y-1 text-xs leading-5 text-stone-500 info-footer">
+                <p>{{ t("dataAttribution") }}</p>
+                <p><a class="legal-footer-link" :href="`/${stay.slug}/responsabilite-donnees`">Utilisation des données et responsabilité</a></p>
+                <p>{{ t("appVersionLabel") }} {{ APP_VERSION }}</p>
+                <p>{{ t("madeBy") }}</p>
+              </footer>
+            </InfoTab>
 
             <p v-if="weatherError" class="panel-block mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
               {{ weatherError }}
@@ -1081,12 +1225,6 @@ onBeforeUnmount(() => {
             <p v-if="seaTemperatureError" class="panel-block mt-4 rounded-2xl bg-amber-100 px-4 py-3 text-sm text-amber-900">
               {{ seaTemperatureError }}
             </p>
-
-            <div class="panel-block mt-4 space-y-1 text-xs leading-5 text-stone-500">
-              <p>{{ t("dataAttribution") }}</p>
-              <p>{{ t("appVersionLabel") }} {{ APP_VERSION }}</p>
-              <p>{{ t("madeBy") }}</p>
-            </div>
           </div>
         </article>
       </section>

@@ -36,10 +36,9 @@ function lerp(start, end, ratio) {
 }
 
 const NEST_ASPECT_RATIO = 1162 / 832;
-const NEST_AWAKE_SRC = "/assets/seegulls-nest-awake.png";
-const NEST_ASLEEP_SRC = "/assets/seegulls-nest-asleep.png";
-
 const props = defineProps({
+  floatingImageUrl: { type: String, default: "/assets/seegulls-nest-awake.png" },
+  floatingImageAsleepUrl: { type: String, default: "/assets/seegulls-nest-asleep.png" },
   hideNest: {
     type: Boolean,
     default: false,
@@ -146,7 +145,7 @@ const isWaterVeryCalm = computed(
 );
 
 function resolveNestTarget(points) {
-  const width = 43;
+  const width = 52;
   const height = width / NEST_ASPECT_RATIO;
 
   if (points.length < 2) {
@@ -226,7 +225,7 @@ const floatingNest = computed(() => {
     width: target.width,
     height: target.height,
     angle: state.nestAngle,
-    href: state.gullsSleeping ? NEST_ASLEEP_SRC : NEST_AWAKE_SRC,
+    href: state.gullsSleeping ? (props.floatingImageAsleepUrl || props.floatingImageUrl) : props.floatingImageUrl,
   };
 });
 const floatingNestStyle = computed(() => {

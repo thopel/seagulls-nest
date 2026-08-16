@@ -13,6 +13,21 @@ cp .env.example .env
 Required variable:
 
 - `VITE_API_MAREE_KEY`: api-maree.fr key used for live tides
+- `VITE_SUPABASE_URL`: URL du projet Supabase
+- `VITE_SUPABASE_ANON_KEY`: clé publique (`anon` ou publishable) Supabase
+
+## Multi-logements et administration
+
+Chaque logement est disponible sous `/<slug>` et son administration sous `/<slug>/admin`.
+L'espace admin permet de masquer les sections, modifier les informations du logement et éditer les zones de stationnement directement sur une carte tactile.
+
+1. Créez un projet Supabase.
+2. Exécutez [`supabase/schema.sql`](supabase/schema.sql) dans le SQL Editor.
+3. Renseignez les deux variables Supabase dans `.env`.
+4. Dans **Authentication > Providers**, gardez Email activé et désactivez les autres providers. Désactivez aussi les inscriptions publiques si les responsables sont créés par vos soins.
+5. Créez le responsable dans **Authentication > Users**, puis exécutez la requête d'attribution commentée à la fin du fichier SQL.
+
+Les règles RLS permettent la lecture publique des pages, mais réservent les modifications aux responsables explicitement rattachés au logement.
 
 ## Stack
 

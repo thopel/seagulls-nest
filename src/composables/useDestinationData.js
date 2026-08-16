@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import destinationConfig from '../data/destination.json'
 import usefulLinksData from '../data/useful-links.json'
 import clearDaySvg from '@meteocons/svg/fill/clear-day.svg'
@@ -215,6 +215,31 @@ function dedupeTurningPoints(events) {
   }
 
   return deduped
+}
+
+function addDaysToKey(key, amount) {
+  const date = parseDateKey(key)
+  date.setDate(date.getDate() + amount)
+  return toDateKey(date)
+}
+
+function mapTideExtrema(payload, dateKey) {
+  const extrema = (Array.isArray(payload?.data) ? payload.data : [])
+    .flatMap((day) => (day.extrema ?? []).map((entry) => ({
+      time: `${day.date ?? dateKey}T${entry.time}:00`,
+      height: Number(entry.height),
+      kind: entry.type === 'PM' ? 'high' : 'low',
+      coef: entry.coef ?? null,
+      coefficientIsAssociated: false
+    })))
+    .filter((entry) => Number.isFinite(entry.height))
+
+  const highTides = extrema.filter((entry) => entry.kind === 'high' && entry.coef !== null)
+  return extrema.map((entry) => {
+    if (entry.kind === 'high' || !highTides.length) return entry
+    const nextHigh = highTides.find((highTide) => new Date(highTide.time) > new Date(entry.time))
+    return nextHigh ? { ...entry, coef: nextHigh.coef, coefficientIsAssociated: true } : entry
+  })
 }
 
 function getTideClockState(series, events, referenceDate, isToday) {
@@ -558,12 +583,21 @@ export function useDestinationData(locale, t) {
 
   const tideSeries = ref([])
   const currentTideSeries = ref([])
+  const tideExtrema = ref([])
+  const currentTideExtrema = ref([])
+  const tideDayGroups = ref([])
+  const tideListLoadingPast = ref(false)
+  const tideListLoadingFuture = ref(false)
+  const tideListStartKey = ref(null)
+  const tideListEndKey = ref(null)
   const tideError = ref('')
   const tideLoading = ref(true)
   const tideSource = ref('none')
   const tideSite = ref(FALLBACK_TIDE_SITE)
 
   const today = new Date()
+  const now = ref(new Date())
+  let tideClockTimer = null
   const selectedDateInput = ref(toDateKey(today))
 
   const selectedDate = computed(() => {
@@ -577,6 +611,10 @@ export function useDestinationData(locale, t) {
 
   const selectedDateKey = computed(() => toDateKey(selectedDate.value))
   const currentDateKey = toDateKey(today)
+  const tideListMinKey = addDaysToKey(currentDateKey, -30)
+  const tideListMaxKey = addDaysToKey(currentDateKey, 30)
+  const canLoadPastTideDays = computed(() => !tideListStartKey.value || tideListStartKey.value > tideListMinKey)
+  const canLoadFutureTideDays = computed(() => !tideListEndKey.value || tideListEndKey.value < tideListMaxKey)
   const selectedLabel = computed(() => formatSelectedDate(selectedDate.value, locale.value))
   const isSelectedToday = computed(() => selectedDateKey.value === toDateKey(today))
   const currentWeather = computed(() => weather.value)
@@ -626,26 +664,19 @@ export function useDestinationData(locale, t) {
 
   const nowEquivalent = computed(() => {
     const date = selectedDate.value
+    const liveNow = now.value
     return new Date(
       date.getFullYear(),
       date.getMonth(),
       date.getDate(),
-      today.getHours(),
-      today.getMinutes(),
+      liveNow.getHours(),
+      liveNow.getMinutes(),
       0,
       0
     )
   })
 
-  const currentNow = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-    today.getHours(),
-    today.getMinutes(),
-    0,
-    0
-  )
+  const currentNow = computed(() => now.value)
 
   const selectedTideCurrent = computed(() => {
     const height = interpolateHeightAt(tideSeries.value, nowEquivalent.value)
@@ -659,24 +690,46 @@ export function useDestinationData(locale, t) {
     return findNearest(tideSeries.value, nowEquivalent.value)
   })
   const currentTideCurrent = computed(() => {
-    const height = interpolateHeightAt(currentTideSeries.value, currentNow)
+    const height = interpolateHeightAt(currentTideSeries.value, currentNow.value)
     if (height !== null) {
       return {
-        time: currentNow.toISOString(),
+        time: currentNow.value.toISOString(),
         height
       }
     }
 
-    return findNearest(currentTideSeries.value, currentNow)
+    return findNearest(currentTideSeries.value, currentNow.value)
   })
-  const tideEvents = computed(() => dedupeTurningPoints(getTurningPoints(tideSeries.value)))
-  const currentTideEvents = computed(() => dedupeTurningPoints(getTurningPoints(currentTideSeries.value)))
+  const currentTideCoefficient = computed(() => {
+    const highTides = currentTideExtrema.value.filter((entry) => entry.kind === 'high' && entry.coef !== null)
+    if (!highTides.length) return null
+    return highTides.reduce((nearest, highTide) =>
+      Math.abs(new Date(highTide.time) - currentNow.value) < Math.abs(new Date(nearest.time) - currentNow.value)
+        ? highTide
+        : nearest
+    ).coef
+  })
+  const tideEvents = computed(() =>
+    tideExtrema.value.length
+      ? tideExtrema.value.filter((entry) => entry.time.startsWith(selectedDateKey.value))
+      : dedupeTurningPoints(getTurningPoints(tideSeries.value))
+  )
+  const currentTideEvents = computed(() =>
+    currentTideExtrema.value.length
+      ? currentTideExtrema.value
+      : dedupeTurningPoints(getTurningPoints(currentTideSeries.value))
+  )
+  const currentUpcomingTides = computed(() =>
+    currentTideEvents.value
+      .filter((entry) => new Date(entry.time) >= currentNow.value)
+      .slice(0, 2)
+  )
   const tideTurns = computed(() => tideEvents.value)
   const tideClock = computed(() =>
     getTideClockState(tideSeries.value, tideEvents.value, nowEquivalent.value, isSelectedToday.value)
   )
   const currentTideClock = computed(() =>
-    getTideClockState(currentTideSeries.value, currentTideEvents.value, currentNow, true)
+    getTideClockState(currentTideSeries.value, currentTideEvents.value, currentNow.value, true)
   )
   const waterRatio = computed(() => {
     const height = tideClock.value.currentHeight ?? selectedTideCurrent.value?.height ?? 0
@@ -800,6 +853,81 @@ export function useDestinationData(locale, t) {
 
   const getTideApiKey = () => import.meta.env.VITE_API_MAREE_KEY
 
+  async function fetchTideDayGroups(fromKey, toKey) {
+    const key = getTideApiKey()
+    if (!key) return []
+    const coefficientLookahead = toKey < tideListMaxKey ? addDaysToKey(toKey, 1) : toKey
+    const payload = await fetchJson(
+      `https://api-maree.fr/tide-extrema?site=${tideSite.value.site_id}&from=${fromKey}&to=${coefficientLookahead}&tz=${DESTINATION.timezone}&key=${encodeURIComponent(key)}`
+    )
+    const events = mapTideExtrema(payload, fromKey)
+    const groups = new Map()
+    for (const event of events) {
+      const dayKey = event.time.slice(0, 10)
+      if (dayKey < fromKey || dayKey > toKey) continue
+      const dayEvents = groups.get(dayKey) ?? []
+      dayEvents.push(event)
+      groups.set(dayKey, dayEvents)
+    }
+    return Array.from(groups, ([key, events]) => ({
+      key,
+      label: formatSelectedDate(parseDateKey(key), locale.value),
+      isToday: key === currentDateKey,
+      events
+    })).sort((a, b) => a.key.localeCompare(b.key))
+  }
+
+  function mergeTideDayGroups(groups) {
+    const merged = new Map(tideDayGroups.value.map((group) => [group.key, group]))
+    for (const group of groups) merged.set(group.key, group)
+    tideDayGroups.value = Array.from(merged.values()).sort((a, b) => a.key.localeCompare(b.key))
+  }
+
+  async function initializeTideDayGroups() {
+    if (tideDayGroups.value.length) return
+    tideListLoadingPast.value = true
+    tideListLoadingFuture.value = true
+    try {
+      const fromKey = addDaysToKey(currentDateKey, -2)
+      const toKey = addDaysToKey(currentDateKey, 2)
+      mergeTideDayGroups(await fetchTideDayGroups(fromKey, toKey))
+      tideListStartKey.value = fromKey
+      tideListEndKey.value = toKey
+    } catch (error) {
+      tideError.value = `${t('tideFetchError')} ${error.message}`
+    } finally {
+      tideListLoadingPast.value = false
+      tideListLoadingFuture.value = false
+    }
+  }
+
+  async function loadMoreTideDays(direction) {
+    await initializeTideDayGroups()
+    if (direction === 'past') {
+      if (tideListLoadingPast.value || tideListStartKey.value <= tideListMinKey) return
+      tideListLoadingPast.value = true
+      try {
+        const toKey = addDaysToKey(tideListStartKey.value, -1)
+        const fromKey = [addDaysToKey(toKey, -4), tideListMinKey].sort().at(-1)
+        mergeTideDayGroups(await fetchTideDayGroups(fromKey, toKey))
+        tideListStartKey.value = fromKey
+      } catch (error) {
+        tideError.value = `${t('tideFetchError')} ${error.message}`
+      } finally { tideListLoadingPast.value = false }
+      return
+    }
+    if (tideListLoadingFuture.value || tideListEndKey.value >= tideListMaxKey) return
+    tideListLoadingFuture.value = true
+    try {
+      const fromKey = addDaysToKey(tideListEndKey.value, 1)
+      const toKey = [addDaysToKey(fromKey, 4), tideListMaxKey].sort().at(0)
+      mergeTideDayGroups(await fetchTideDayGroups(fromKey, toKey))
+      tideListEndKey.value = toKey
+    } catch (error) {
+      tideError.value = `${t('tideFetchError')} ${error.message}`
+    } finally { tideListLoadingFuture.value = false }
+  }
+
   async function fetchTideSeriesForDate(targetDate, targetKey) {
     const key = getTideApiKey()
     const cacheKey = `coastal-companion-tides-${targetKey}`
@@ -815,19 +943,29 @@ export function useDestinationData(locale, t) {
     try {
       const from = getIsoAtLocalTime(targetDate, 0, 0)
       const to = getIsoAtLocalTime(targetDate, 23, 59)
-      const payload = await fetchJson(
-        `https://api-maree.fr/water-levels?site=${tideSite.value.site_id}&from=${from}&to=${to}&step=${DESTINATION.tide.stepMinutes}&tz=${DESTINATION.timezone}&key=${encodeURIComponent(key)}`
-      )
+      const previousDate = new Date(targetDate)
+      previousDate.setDate(previousDate.getDate() - 1)
+      const extremaFrom = toDateKey(previousDate)
+      const nextDate = new Date(targetDate)
+      nextDate.setDate(nextDate.getDate() + 1)
+      const extremaTo = toDateKey(nextDate)
+      const [payload, extremaPayload] = await Promise.all([
+        fetchJson(`https://api-maree.fr/water-levels?site=${tideSite.value.site_id}&from=${from}&to=${to}&step=${DESTINATION.tide.stepMinutes}&tz=${DESTINATION.timezone}&key=${encodeURIComponent(key)}`),
+        fetchJson(`https://api-maree.fr/tide-extrema?site=${tideSite.value.site_id}&from=${extremaFrom}&to=${extremaTo}&tz=${DESTINATION.timezone}&key=${encodeURIComponent(key)}`)
+      ])
 
       const series = payload.data ?? []
+      const extrema = mapTideExtrema(extremaPayload, targetKey)
       setCache(cacheKey, {
         site: tideSite.value,
-        series
+        series,
+        extrema
       })
 
       return {
         series,
         source: 'api',
+        extrema,
         error: ''
       }
     } catch (error) {
@@ -837,6 +975,7 @@ export function useDestinationData(locale, t) {
         return {
           series: cached.series,
           source: 'cache',
+          extrema: cached.extrema ?? [],
           error: t('cachedTides')
         }
       }
@@ -844,6 +983,7 @@ export function useDestinationData(locale, t) {
       return {
         series: [],
         source: 'none',
+        extrema: [],
         error: `${t('tideFetchError')} ${error.message}`
       }
     }
@@ -892,18 +1032,12 @@ export function useDestinationData(locale, t) {
       )
 
       weather.value = mapWeather(payload, locale.value, t)
-      if (!selectedDateOptions.value.some((entry) => entry.key === selectedDateInput.value)) {
-        selectedDateInput.value = selectedDateOptions.value[0]?.key ?? currentDateKey
-      }
       setCache(cacheKey, weather.value)
     } catch (error) {
       const cached = getCache(cacheKey)
       if (cached) {
         weather.value = cached
-        if (!cached.forecastDays?.some((entry) => entry.key === selectedDateInput.value)) {
-          selectedDateInput.value = cached.forecastDays?.[0]?.key ?? currentDateKey
-        }
-        weatherError.value = t('cachedWeather')
+        weatherError.value = ''
       } else {
         weatherError.value = `${t('weatherFetchError')} ${error.message}`
       }
@@ -911,16 +1045,6 @@ export function useDestinationData(locale, t) {
       weatherLoading.value = false
     }
   }
-
-  watch(selectedDateOptions, (options) => {
-    if (!options.length) {
-      return
-    }
-
-    if (!options.some((entry) => entry.key === selectedDateInput.value)) {
-      selectedDateInput.value = options[0].key
-    }
-  })
 
   async function resolveTideSite() {
     try {
@@ -950,11 +1074,13 @@ export function useDestinationData(locale, t) {
     tideError.value = ''
     const result = await fetchTideSeriesForDate(selectedDate.value, selectedDateKey.value)
     tideSeries.value = result.series
+    tideExtrema.value = result.extrema ?? []
     tideSource.value = result.source
     tideError.value = result.error
 
     if (isSelectedToday.value) {
       currentTideSeries.value = result.series
+      currentTideExtrema.value = result.extrema ?? []
     } else if (!currentTideSeries.value.length) {
       await loadCurrentTides()
     }
@@ -965,14 +1091,21 @@ export function useDestinationData(locale, t) {
   async function loadCurrentTides() {
     const result = await fetchTideSeriesForDate(today, currentDateKey)
     currentTideSeries.value = result.series
+    currentTideExtrema.value = result.extrema ?? []
   }
 
   onMounted(async () => {
+    tideClockTimer = window.setInterval(() => { now.value = new Date() }, 1_000)
     await resolveTideSite()
     await Promise.all([loadWeather(), loadSeaTemperature(), loadTides()])
+    await initializeTideDayGroups()
     if (!currentTideSeries.value.length) {
       await loadCurrentTides()
     }
+  })
+
+  onBeforeUnmount(() => {
+    if (tideClockTimer) window.clearInterval(tideClockTimer)
   })
 
   watch(selectedDateKey, () => {
@@ -990,6 +1123,8 @@ export function useDestinationData(locale, t) {
     currentSeaTemperature,
     currentTideClock,
     currentTideCurrent,
+    currentTideCoefficient,
+    currentUpcomingTides,
     currentWaterRatio,
     currentWeather,
     selectedDate,
@@ -1002,6 +1137,12 @@ export function useDestinationData(locale, t) {
     tideClock,
     tideCurrent: selectedTideCurrent,
     tideEvents,
+    tideDayGroups,
+    tideListLoadingPast,
+    tideListLoadingFuture,
+    canLoadPastTideDays,
+    canLoadFutureTideDays,
+    loadMoreTideDays,
     tideError,
     tideGraph,
     tideLoading,

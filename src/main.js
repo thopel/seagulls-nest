@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App.vue'
 import './style.css'
+import { loadStay } from './composables/useStay'
 
 if (import.meta.env.DEV && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
@@ -21,4 +22,4 @@ if (import.meta.env.DEV && typeof window !== 'undefined' && 'serviceWorker' in n
   })
 }
 
-createApp(App).mount('#app')
+loadStay().finally(() => createApp(App).mount('#app'))
